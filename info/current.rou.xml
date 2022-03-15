@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes>
+	<vType id="CarA" length="5" maxSpeed="22"/>
+	<flow id="A01" type="CarA" begin="0" end="600" number="1">
+		<route edges="E01"/>
+	</flow>
+	<flow id="A03" type="CarA" begin="0" end="600" number="5">
+		<route edges="E03"/>
+	</flow>
+	<flow id="A04" type="CarA" begin="0" end="600" number="3">
+		<route edges="E04"/>
+	</flow>
+	<flow id="A10" type="CarA" begin="0" end="600" number="2">
+		<route edges="E10"/>
+	</flow>
+	<flow id="A12" type="CarA" begin="0" end="600" number="8">
+		<route edges="E12"/>
+	</flow>
+	<flow id="A14" type="CarA" begin="0" end="600" number="3">
+		<route edges="E14"/>
+	</flow>
+	<flow id="A21" type="CarA" begin="0" end="600" number="5">
+		<route edges="E21"/>
+	</flow>
+	<flow id="A23" type="CarA" begin="0" end="600" number="2">
+		<route edges="E23"/>
+	</flow>
+	<flow id="A24" type="CarA" begin="0" end="600" number="1">
+		<route edges="E24"/>
+	</flow>
+	<flow id="A30" type="CarA" begin="0" end="600" number="2">
+		<route edges="E30"/>
+	</flow>
+	<flow id="A32" type="CarA" begin="0" end="600" number="5">
+		<route edges="E32"/>
+	</flow>
+	<flow id="A34" type="CarA" begin="0" end="600" number="1">
+		<route edges="E34"/>
+	</flow>
+	<flow id="A40" type="CarA" begin="0" end="600" number="1">
+		<route edges="E40"/>
+	</flow>
+	<flow id="A41" type="CarA" begin="0" end="600" number="2">
+		<route edges="E41"/>
+	</flow>
+	<flow id="A42" type="CarA" begin="0" end="600" number="1">
+		<route edges="E42"/>
+	</flow>
+	<flow id="A43" type="CarA" begin="0" end="600" number="2">
+		<route edges="E43"/>
+	</flow>
+</routes>
