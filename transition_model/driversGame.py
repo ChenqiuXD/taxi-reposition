@@ -3,6 +3,7 @@ from Node import Node
 from utils import get_adj_mat
 import numpy as np
 import sys
+import os
 from config import get_config
 from sumo_util import SumoEnv
 import matplotlib.pyplot as plt
@@ -17,10 +18,16 @@ class Game:
             args: hyper-parameters 
         """
         # SUMO related args
-        self.num_node, self.edges, self.node_init_car, self.node_demand, \
-        self.node_upcoming_car, self.node_bonus, self.edge_traffic = setting.values()   # Unpack args
+        self.init_settings(setting) # Assign simulation related parameters
         adj_mat = get_adj_mat(self.edges)    # Convert COO form connection to adjency matrix
         self.edge_len = adj_mat * 100.   # Each len is 100 meters long
+
+        # add simulation related PATH variables
+        if 'SUMO_HOME' in os.environ:
+            tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
+            sys.path.append(tools)
+        else:
+            sys.exit("please declare environment variable 'SUMO_HOME'")
 
         # hyper-parameters
         self.lr = args.lr
@@ -32,6 +39,11 @@ class Game:
         self.sumo = SumoEnv(setting)
         self.nodes = [Node(i, setting, self.lr, self.max_epoch, self.node_init_car[i], self.node_demand[i], self.node_upcoming_car[i],
                            self.node_bonus[i]) for i in range(self.num_node)]
+
+    def init_settings(self, setting):
+        """Change the settings of demand, initial cars, and other values"""
+        self.num_node, self.edges, self.node_init_car, self.node_demand, \
+        self.node_upcoming_car, self.node_bonus, self.edge_traffic = setting.values()   # Unpack args
 
     def choose_actions(self):
         """Drivers choose actions according to their policies"""
@@ -78,7 +90,6 @@ class Game:
         # Calculate the overall payoff
         return -idle_cost - time_mat + bonuses
 
-
     def update_policy(self, payoff):
         """Drivers update their policies
         parrams: 
@@ -109,6 +120,7 @@ class Game:
     def get_data(self):
         """Return the data: initial_state -> drivers' final policies"""
         print("Getting data")
+        return -1
 
 def main(setting, args):
     # Parse args
@@ -121,30 +133,16 @@ def main(setting, args):
     
     iter_cnt = 0
     while iter_cnt<max_epoch:
-        # Drivers chooses actions
-        actions = game.choose_actions()
-
-        # Simulate to observe outcomes
-        time_mat = game.simulate_game(actions)
-        payoff = game.observe_payoff(time_mat, actions)
-
-        # Drivers Update their policies
-        update_term = game.update_policy(payoff)
-
-        # Check convergence
-        if game.check_convergence(update_term):
+        is_converged = game.run(iter_cnt)
+        if is_converged:
             print("Game converged")
-            for i in range(num_node):
-                game.nodes[i].value_table = game.nodes[i].value_table[:iter_cnt, :]
             break
-        else:
-            print("At iteration ", iter_cnt, " the max update term is: ", np.max(update_term))
-
+        
         iter_cnt += 1
-    
+
     # Return the final value
     game.plot()
-    game.get_data()
+    return game.get_data()
 
 
 if __name__ == "__main__":
