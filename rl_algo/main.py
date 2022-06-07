@@ -10,7 +10,7 @@ from utils.config import get_config
 def parse_args(args, parser):
     parser.add_argument('--scenario_name', type=str,
                         default='simple_spread', help="Which scenario to run on")
-    parser.add_argument('--epsilon', type=int, default=0.1,
+    parser.add_argument('--epsilon', type=int, default=0.9,
                         help="Epsilon greedy")
     parser.add_argument('--train', action="store_false", default=True, help='Training or evaluation')
     parser.add_argument('--render', action="store_false", default=True, help='Render or not')

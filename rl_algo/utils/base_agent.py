@@ -7,15 +7,11 @@ class BaseAgent:
         """Base agent class for q-methods ('iql', 'vdn', 'qmix') agents"""
         self.args = args
         self.algo = args.algorithm_name
-        self.q_methods = ['iql', 'vdn', 'qmix']
         self.num_agents = env_config['num_agents']
         self.dim_action = env_config['dim_action']
         self.discrete_action_space = env_config['discrete_action_space']
         self.dim_obs = env_config['dim_observation']
-
-        if self.algo not in self.q_methods:
-            raise NotImplementedError("The method ", self.algo, 
-                                      " is not in the q_methods. Please check base_agent.py to see details")
+        self.episode_length = args.episode_length
 
         # un-tunable parameters
         self.device = self.args.device
@@ -34,6 +30,18 @@ class BaseAgent:
 
     def learn(self):
         raise NotImplementedError
+
+    def warmup(self):
+        pass
+    
+    def prep_train(self):
+        pass
+    
+    def prep_eval(self):
+        pass
+    
+    def hard_target_update(self):
+        pass
 
     def append_transition(self, obs, action, reward, obs_):
         """Store transition"""
@@ -57,20 +65,17 @@ class BaseAgent:
         :param is_random: (bool) whether randomly choose action
         """
         eps = np.random.uniform(0, 1)
-        if is_random or eps <= self.e_greedy:
+        if is_random or eps >= self.e_greedy:
             return [np.random.choice(range(self.dim_action)) for _ in range(self.num_agents)]
         else:
-            if self.algo in self.q_methods:
-                if self.share_policy:
-                    obs = torch.FloatTensor(np.array(obs)).view(self.num_agents, self.dim_obs).to(self.device)
-                    q_vals = self.agent_q_nets[0](obs)
-                    actions = torch.max(q_vals, dim=1)[1].tolist()
-                else:
-                    actions = np.zeros(self.num_agents)
-                    for i in range(self.num_agents):
-                        q_vals = self.agent_q_nets[i](torch.FloatTensor(obs[i]).to(self.device))
-                        _, action = torch.max(q_vals, dim=0)
-                        actions[i] = action.item()
-                return actions
+            if self.share_policy:
+                obs = torch.FloatTensor(np.array(obs)).view(self.num_agents, self.dim_obs).to(self.device)
+                q_vals = self.agent_q_nets[0](obs)
+                actions = torch.max(q_vals, dim=1)[1].tolist()
             else:
-                raise NotImplementedError("Method "+self.algo+" is not implemented")
+                actions = np.zeros(self.num_agents)
+                for i in range(self.num_agents):
+                    q_vals = self.agent_q_nets[i](torch.FloatTensor(obs[i]).to(self.device))
+                    _, action = torch.max(q_vals, dim=0)
+                    actions[i] = action.item()
+            return actions

@@ -7,7 +7,8 @@ def get_config():
 
     # prepare parameters
     parser.add_argument("--algorithm_name", type=str, default="rmatd3", choices=[
-                        "rmatd3", "rmaddpg", "rmasac", "qmix", "vdn", "matd3", "maddpg", "masac", "mqmix", "mvdn", "iql"])
+                        "qmix", "vdn", "iql", "random", "q_learning", 'null', 'heuristic', 'mvdn', 'mq_learning',
+                        'q_gnn', 'adp_vdn'])
     parser.add_argument("--experiment_name", type=str, default="check")
     parser.add_argument("--seed", type=int, default=1,
                         help="Random seed for numpy/torch")
@@ -111,7 +112,7 @@ def get_config():
     # algo common parameters
     parser.add_argument('--batch_size', type=int, default=32,
                         help="Number of buffer transitions to train on at once")
-    parser.add_argument('--gamma', type=float, default=0.99,
+    parser.add_argument('--gamma', type=float, default=1,
                         help="Discount factor for env")
     parser.add_argument("--use_max_grad_norm",
                         action='store_false', default=True)

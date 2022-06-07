@@ -43,8 +43,14 @@ class Runner:
         self.eval_interval = self.episode_length * 100
 
         self.env = env
-        self.num_agent = env.n
+        self.num_agent = env.n_node
 
+        # setup the agent 
+        self.agent = self.setup_agent()
+
+    def setup_agent(self):
+        """Setup agent algorithm
+        P.S. setup this function so that in final experiment, new algorithms could be added"""
         # initialize the policies and organize the agents
         if self.algorithm_name == "qmix":
             from QMix.q_mixer import QMixer as Algo
@@ -61,9 +67,7 @@ class Runner:
             "dim_observation": self.env.observation_space[0].shape[0],
             "discrete_action_space": self.env.discrete_action_space
         }
-        self.agent = Algo(self.args, env_config)
-        if self.args.train:
-            self.warmup()
+        return Algo(self.args, env_config)
 
     def warmup(self):
         """Fill up agents' replay buffer"""
@@ -78,7 +82,7 @@ class Runner:
         print("Finished warming up")
 
     def run(self):
-        """Collect a training episode and perform training, saving, logging and evaluation steps"""
+        """Collect a training episode and perform training, saving, logging and evaluation steps"""            
         # Collect data
         self.agent.prep_train()     # call all network.train()
 
