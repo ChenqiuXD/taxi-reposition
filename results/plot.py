@@ -24,7 +24,7 @@ def get_edge_index(edge_traffic):
 # Load result
 def main():
     # file_name = "./results/null_episodes_10000_length_6_seed_35_01_03_15_43"  # Run this when debugging
-    file_name = "./null_episodes_10000_length_6_seed_35_01_03_15_43"            # Run this when directly running the script. 
+    file_name = "./heuristic_episodes_5000_length_6_seed_35_01_04_15_02"            # Run this when directly running the script. 
     f = open(file_name, 'rb')
     result = pickle.load(f)
 
@@ -67,9 +67,10 @@ def main():
         # data_demands = [[ result[episode_idx][num_step]["obs"]["demands"][i] for i in range(num_nodes) ] for episode_idx in range(result_length)]
         # data_idle_drivers = [[ (np.sum(result[episode_idx][num_step]["nodes actions"], axis=0)+
         #                     result[episode_idx][num_step]["obs"]["upcoming_cars"])[i]  for i in range(num_nodes) ] for episode_idx in range(result_length) ]
+        # ratio = (data_demands+data_idle_drivers) / data_demands
         data_demands = np.array( [result['init_setting']['demands'][num_step]]*result_length )
         data_idle_drivers = np.array([ result["idle_drivers_traj"][episode_idx][num_step+1] for episode_idx in range(result_length) ])
-        ratio = (data_demands+data_idle_drivers) / data_demands
+        ratio = data_idle_drivers / data_demands
 
         # Plot result for each node
         for idx in range(num_nodes):

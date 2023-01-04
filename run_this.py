@@ -79,10 +79,10 @@ def main(args):
 
 if __name__ == "__main__":
     # Options: null, random, heuristic, DDPG, metaGrad, direct
-    algo = 'null'
+    algo = 'heuristic'
 
     input_args = ['--algorithm_name', algo, '--seed', '35', '--episode_length', '6', '--lr', '1e-4', '--buffer_size', '16',
-                  '--batch_size', '4', '--hard_update_interval', '20', '--max_warmup_steps', '200', '--num_env_steps', '10000', '--render']
+                  '--batch_size', '4', '--hard_update_interval', '20', '--max_warmup_steps', '200', '--num_env_steps', '5000', '--render']
 
     # Check if there are input from system, then run the command.
     if sys.argv[1:]:

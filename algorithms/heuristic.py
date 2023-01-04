@@ -10,30 +10,30 @@ class HeuristicPolicy(BaseAgent):
         self.min_bonus = 0
 
         self.num_nodes = env_config["num_nodes"]
-        self.ratio_list = np.zeros([self.episode_length, self.num_nodes])
+        self.ratio_list = np.ones([self.episode_length, self.num_nodes])*1.01   # Multiply by 1.01, then bonuses would be initially zeros when applying the self.learn() function 
         self.action = np.zeros([self.episode_length, self.num_nodes])
 
     def append_transition(self, obs, action, reward, done, obs_, info):
         demands = obs["demands"]
-        drivers = obs_["idle_drivers"] + demands
+        drivers = obs_["idle_drivers"]  # We use the bonuses at current time_step to influence the idle_drivers distribution at next time_step
         ratio = drivers / demands
         time_step = obs["time_step"]
 
         self.ratio_list[time_step] = ratio
 
     def learn(self):
-        for episode_idx in range(self.episode_length):
+        for time_step in range(self.episode_length):
             for i in range(self.num_nodes):
-                if self.ratio_list[episode_idx][i] > 4:
-                    self.action[episode_idx][i] = 0
-                elif self.ratio_list[episode_idx][i] > 3:
-                    self.action[episode_idx][i] = 1
-                elif self.ratio_list[episode_idx][i] >2:
-                    self.action[episode_idx][i] = 2
-                elif self.ratio_list[episode_idx][i] > 1:
-                    self.action[episode_idx][i] = 3
+                if self.ratio_list[time_step][i] > 1:
+                    self.action[time_step][i] = 0
+                elif self.ratio_list[time_step][i] > 0.85:
+                    self.action[time_step][i] = 1
+                elif self.ratio_list[time_step][i] >0.7:
+                    self.action[time_step][i] = 2
+                elif self.ratio_list[time_step][i] > 0.55:
+                    self.action[time_step][i] = 3
                 else:
-                    self.action[episode_idx][i] = 4
+                    self.action[time_step][i] = 4
 
 
     def choose_action(self, obs, is_random):
