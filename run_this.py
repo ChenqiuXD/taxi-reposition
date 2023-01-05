@@ -32,6 +32,13 @@ def main(args):
 
     # set seeds
     # torch.manual_seed(all_args.seed)
+    # torch.cuda.manual_seed_all(arser)
+    all_args.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print("Current using ", all_args.device)
+    print("Render is ", all_args.render)
+
+    # set seeds
+    # torch.manual_seed(all_args.seed)
     # torch.cuda.manual_seed_all(all_args.seed)
     np.random.seed(all_args.seed)
 
@@ -73,9 +80,10 @@ if __name__ == "__main__":
     # Options: null, random, heuristic, DDPG, metaGrad, direct
     algo = 'heuristic'
 
-    input_args = ['--algorithm_name', algo, '--seed', '35', '--episode_length', '6', '--min_bonus', '0', '--max_bonus', '4', 
+    input_args = ['--algorithm_name', algo, '--seed', '35', '--mode', 'train', 
+                  '--episode_length', '6', '--min_bonus', '0', '--max_bonus', '5', '--lr_drivers', '1e-3',
+                  '--warmup_steps', '200', '--num_env_steps', '5000', 
                   '--lr', '1e-4', '--buffer_size', '16', '--batch_size', '4', '--hard_update_interval', '20',
-                  '--lr_drivers', '1e-3', '--warmup_steps', '200', '--num_env_steps', '5000', 
                   '--render']
 
     # Check if there are input from system, then run the command.

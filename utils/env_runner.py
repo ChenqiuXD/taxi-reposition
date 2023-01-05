@@ -107,6 +107,7 @@ class EnvRunner:
                 self.env.render(mode="not_human")
 
             action = self.agent.choose_action(obs, is_random=False)
+            action = self.normalize_actions(action)
             obs_, reward_list, done, info = self.env.step(action)  # reward_list : [idle_prob, avg_travelling_cost, bonuses_cost, overall_cost](+,+,+,-) only the last one is minus
             print("At step", step, " agent choose action ", action)
             print("At step {}, costs are: idle_prob {}, travelling_cost {}, bonuses_cost {}".format(step, reward_list[0], reward_list[1], reward_list[2]) )
@@ -131,6 +132,11 @@ class EnvRunner:
                 break
 
         return reward_traj, action_traj
+
+    def normalize_actions(self, actions):
+        """ Normalize the actions from [-1, 1] to [min_bonus, max_bonus] """
+        k = (self.args.max_bonus - self.args.min_bonus) / (1-(-1))
+        return (actions-(-1))*k+self.args.min_bonus
 
     def store_data(self):
         """This function store necessary data"""

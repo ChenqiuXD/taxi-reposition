@@ -2,6 +2,9 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 
+import platform
+import os, sys
+
 def get_edge_index(edge_traffic):
     edge_index = []
     num_nodes = edge_traffic.shape[0]
@@ -24,7 +27,9 @@ def get_edge_index(edge_traffic):
 # Load result
 def main():
     # file_name = "./results/null_episodes_10000_length_6_seed_35_01_03_15_43"  # Run this when debugging
-    file_name = "./heuristic_episodes_5000_length_6_seed_35_01_04_15_02"            # Run this when directly running the script. 
+    file_name = "./heuristic_episodes_5000_length_6_seed_35_01_05_17_54"            # Run this when directly running the script. 
+    if platform.system()[0] == 'L':     # Program runs on linux
+        file_name = os.getcwd()+'/results'+file_name[1:]
     f = open(file_name, 'rb')
     result = pickle.load(f)
 
@@ -94,7 +99,10 @@ def main():
             plt.legend(loc="upper right")
 
         plt.legend(loc="upper right")
-        plt.savefig(file_name[2:]+"_idle_drivers.png")
+        if platform.system()[0] == 'L':
+            plt.savefig(file_name+'_idle_drivers.png')
+        else:
+            plt.savefig(file_name[2:]+"_idle_drivers.png")
 
 
 
@@ -113,9 +121,10 @@ def main():
             reward_sequence = [ np.mean(result['reward_traj'][j][:,i]) for j in range(result_length) ]
             plt.plot(np.arange(result_length-num_avg), np.array([np.mean(reward_sequence[j:j+num_avg]) for j in range(len(reward_sequence)-num_avg)]))
         # plt.show()
-        plt.savefig(file_name[2:]+"_cost_traj.png")
-
-
+        if platform.system()[0] == 'L':
+            plt.savefig(file_name+'_cost_traj.png')
+        else:
+            plt.savefig(file_name[2:]+"_cost_traj.png")
 
     # -------------------------------------------------------------------------------------------------------
     # 3 node's value table

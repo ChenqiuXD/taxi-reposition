@@ -83,7 +83,6 @@ class Env:
         time_mat = self.get_time_mat(self.cur_state["len_mat"], self.cur_state["edge_traffic"], self.adj_mat)
         self.sim_time_mat = time_mat
 
-        actions = self.normalize_actions(actions)
         if not is_warmup:   # While warming up, keep the policies of nodes unchanged. 
             payoff = self.games[time_step].observe_payoff(actions, time_mat, nodes_actions)
             self.games[time_step].update_policy(payoff)
@@ -160,7 +159,7 @@ class Env:
 
         # Calculate bonuses
         max_bonus = np.sum(nodes_actions)*self.max_bonus    # Assign max_bonus to each node
-        min_bonus = 0   # Do not assign any bonuses
+        min_bonus = np.sum(nodes_actions)*self.min_bonus   # Do not assign any bonuses
         bonuses_cost = (np.sum(nodes_actions*bonuses)-min_bonus)/(max_bonus-min_bonus)
         bonuses_cost *= norm_factor['bonus_cost']
 
@@ -169,12 +168,6 @@ class Env:
         print("costs are: {}".format([idle_cost, avg_travelling_cost, bonuses_cost]))
 
         return np.array([-idle_cost, -avg_travelling_cost, -bonuses_cost, -overall_cost])*10  + 10
-
-    def normalize_actions(self, actions):
-        """ The output action range from [-1, 1], thus should be normalize into [min_bonus, max_bonus] """
-        k = (self.max_bonus - self.min_bonus) / (1 - (-1))  # since agents output range from [-1,1]
-        normalized_actions = (actions - (-1)) * k + self.min_bonus
-        return normalized_actions
 
     def get_time_mat(self, len_mat, traffic, adj_mat):
         """ This function simulate the re-position process and return the time matrix 
