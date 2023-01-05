@@ -1,25 +1,11 @@
 import numpy as np
 import argparse
 from environment.utils import get_adj_mat, vec2mat
-from environment.game_model import Game
-
-def parse_args():
-    """ Use to parse the arguments """
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--lr_drivers', required=False, default=1e-3, type=float, help='learning rate of drivers')
-    parser.add_argument('--epoch', required=False, default=1000, type=int, help='number of epoch')
-    parser.add_argument('--display', required=False, default=False, type=int, help='whether use sumo to display')
-    parser.add_argument('--max_bonus', required=False, default=4, type=float, help='maximum bonus')
-    parser.add_argument('--sim_stpes', required=False, default=600, type=int, help='sumo-simulated steps')
-    parser.add_argument('--max_warmup_steps', required=False, default=200, type=int, help='warmup steps')
-
-    args = parser.parse_args()
-
-    return args   
+from environment.game_model import Game 
 
 class Env:
     """ The reinforcement learning environment """
-    def __init__(self, env_config):
+    def __init__(self, env_config, args):
         """ This function initialize the environment
         INPUT:          env_config: (dict) environment related informatino. e.g. num_nodes, length_matrix
          """
@@ -31,17 +17,16 @@ class Env:
         self.len_mat = vec2mat(self.edge_index, self.len_vec)
         self.dim_node_obs = self.env_config["dim_node_obs"]
         self.dim_edge_obs = self.env_config["dim_edge_obs"]
-        self.episode_length = self.env_config["episode_length"]
-        self.max_epoch = self.env_config["num_env_steps"]
+        self.episode_length = args.episode_length
 
-        self.action_space = self.env_config["dim_action"]    # action_space = 5 -> bonus range from [0,1,2,3,4]
-        self.max_bonus = self.action_space-1  # 5--1 = 4
+        self.dim_action = self.num_nodes
+        self.max_bonus = args.max_bonus
+        self.min_bonus = args.min_bonus
         self.obs_spaces = self.dim_node_obs * self.num_nodes + self.dim_edge_obs * self.edge_index.shape[1]
         # total observation dimension =  node_obs * num_nodes + edge_obs * num_edges
 
         # flag of whether reset
         self.is_reset = False
-        # self.lr = 5e-3  # learning rate for drivers agents. Useful when drivers agents are learning using some neural network
 
         # Drivers' Game, used to simulate the payoff
         setting = {
@@ -55,16 +40,11 @@ class Env:
             "edge_traiffc" : self.env_config["edge_traffic"][0],    # edge_traffic at time 0 [num_nodes * num_nodes]
         }
 
-        # arg = Arg(lr=self.lr, epoch=self.max_epoch ,max_bonus=self.action_space-1, sim_steps=600, max_warmup_steps=args.max_warmup_steps)    # action_space is 5, max_bonus = 5-1 = 4 since bonus range from [0,1,2,3,4]
-        arg = parse_args()
-        self.games = [Game(setting, arg) for _ in range(self.episode_length)]    # For time_step in range(episode_length), there is a game
+        self.games = [Game(setting, args) for _ in range(self.episode_length)]    # For time_step in range(episode_length), there is a game
         self.cur_state = None # Initialize in self.reset()
 
     def reset(self):
-        """ Reset the envirnonment. Usually used when start a new episode
-        INPUT:      None
-        OUTPUT:     None
-         """
+        """ Reset the envirnonment. Usually used when start a new episode """
         self.is_reset = True
 
         # Get initial state
@@ -103,6 +83,7 @@ class Env:
         time_mat = self.get_time_mat(self.cur_state["len_mat"], self.cur_state["edge_traffic"], self.adj_mat)
         self.sim_time_mat = time_mat
 
+        actions = self.normalize_actions(actions)
         if not is_warmup:   # While warming up, keep the policies of nodes unchanged. 
             payoff = self.games[time_step].observe_payoff(actions, time_mat, nodes_actions)
             self.games[time_step].update_policy(payoff)
@@ -115,7 +96,7 @@ class Env:
             time_step = self.cur_state["time_step"] + 1
             done = False
 
-        # Calculate reward for coordinator agents: returns a list [idle_cost, travelling_time_cost, bonuses_cost]
+        # Calculate reward for drivers agents: returns a list [idle_cost, travelling_time_cost, bonuses_cost]
         reward = self.reward_func(time_mat, actions, nodes_actions) # actions are the bonuses, nodes_actions are the distribution of idle drivers
         # print("Cost is: ", cost)
 
@@ -189,6 +170,12 @@ class Env:
 
         return np.array([-idle_cost, -avg_travelling_cost, -bonuses_cost, -overall_cost])*10  + 10
 
+    def normalize_actions(self, actions):
+        """ The output action range from [-1, 1], thus should be normalize into [min_bonus, max_bonus] """
+        k = (self.max_bonus - self.min_bonus) / (1 - (-1))  # since agents output range from [-1,1]
+        normalized_actions = (actions - (-1)) * k + self.min_bonus
+        return normalized_actions
+
     def get_time_mat(self, len_mat, traffic, adj_mat):
         """ This function simulate the re-position process and return the time matrix 
         INPUT:      len_mat: ([num_nodes, num_nodes] ndarray) the length matrix between nodes
@@ -206,13 +193,14 @@ class Env:
         return time_mat
 
     def get_nodes_actions(self):
-        """ This function returns the nodes_actions currently """
+        """ Returns the nodes_actions currently """
         nodes_actions = np.zeros([self.episode_length, self.num_nodes, self.num_nodes])
         for i in range(self.episode_length):
                 nodes_actions[i] =  self.games[i].get_nodes_actions()
         return nodes_actions
     
-    def get_setting(self):
+    def get_init_setting(self):
+        """ Return init settings """
         return {"initial_drivers": self.env_config["initial_drivers"], 
                  "upcoming_cars": self.env_config["upcoming_cars"], 
                  "demands": self.env_config["node_demand"], 

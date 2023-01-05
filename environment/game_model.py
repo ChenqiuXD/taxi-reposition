@@ -18,12 +18,13 @@ class Game:
 
         # hyper-parameters
         self.lr_drivers = args.lr_drivers
-        self.max_epoch = args.epoch # equals num_env_steps
-        self.is_display = args.display
-        self.max_bonus = args.max_bonus # equals 5
+        self.max_epoch = args.num_env_steps
+        # self.is_display = args.render
+        self.max_bonus = args.max_bonus
+        self.min_bonus = args.min_bonus
 
         # Initialize env
-        self.nodes = [Node(i, setting, self.lr_drivers, max_epoch=self.max_epoch, warmup_epoch=args.max_warmup_steps) for i in range(self.num_nodes)]
+        self.nodes = [Node(i, setting, self.lr_drivers, max_epoch=self.max_epoch, warmup_epoch=args.warmup_steps) for i in range(self.num_nodes)]
 
     def init_settings(self, setting):
         """Change the settings of demand, initial cars, and other values"""
@@ -69,12 +70,12 @@ class Game:
         norm_factor = [0.15, 0.35, 1]
         # Calculate idle drivers
         node_all_cars = np.sum(actions, axis=0) + self.node_upcoming_car
-        idle_cost = -np.tile(node_all_cars/self.node_demand*self.max_bonus*norm_factor[0],
+        idle_cost = -np.tile(node_all_cars/self.node_demand* (self.max_bonus-self.min_bonus) *norm_factor[0],
                             (self.num_nodes, 1))   # For normalization, multiply by max_bonus
 
         # Calculate the travelling time
         max_time = np.max(time_mat)
-        time_mat = -time_mat / max_time * self.max_bonus * norm_factor[1] # For normalization, multipy by max_bonus
+        time_mat = -time_mat / max_time *  (self.max_bonus-self.min_bonus)  * norm_factor[1] # For normalization, multipy by max_bonus
 
         # Calculate bonuses
         bonuses = np.tile(bonuses, (self.num_nodes, 1)) * norm_factor[2]

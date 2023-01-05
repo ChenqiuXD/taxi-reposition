@@ -6,8 +6,6 @@ class HeuristicPolicy(BaseAgent):
         self.args = args
         self.env_config = env_config
         self.episode_length = args.episode_length
-        self.max_bonus = env_config["dim_action"] - 1
-        self.min_bonus = 0
 
         self.num_nodes = env_config["num_nodes"]
         self.ratio_list = np.ones([self.episode_length, self.num_nodes])*1.01   # Multiply by 1.01, then bonuses would be initially zeros when applying the self.learn() function 
@@ -22,18 +20,19 @@ class HeuristicPolicy(BaseAgent):
         self.ratio_list[time_step] = ratio
 
     def learn(self):
+        """ Change bonuses according to recorded idle_drivers/demands ratios. Note that the range of bonus are [-1, 1]"""
         for time_step in range(self.episode_length):
             for i in range(self.num_nodes):
                 if self.ratio_list[time_step][i] > 1:
-                    self.action[time_step][i] = 0
+                    self.action[time_step][i] = -1
                 elif self.ratio_list[time_step][i] > 0.85:
-                    self.action[time_step][i] = 1
+                    self.action[time_step][i] = -0.5
                 elif self.ratio_list[time_step][i] >0.7:
-                    self.action[time_step][i] = 2
+                    self.action[time_step][i] = 0
                 elif self.ratio_list[time_step][i] > 0.55:
-                    self.action[time_step][i] = 3
+                    self.action[time_step][i] = 0.5
                 else:
-                    self.action[time_step][i] = 4
+                    self.action[time_step][i] = 1
 
 
     def choose_action(self, obs, is_random):

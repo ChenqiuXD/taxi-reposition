@@ -9,5 +9,5 @@ class NullPolicy(BaseAgent):
         self.num_nodes = env_config["num_nodes"]
 
     def choose_action(self, obs, is_random):
-        """ directly return [0]*num_nodes """
-        return np.array([0]*self.num_nodes)
+        """ directly return [-1]*num_nodes. Note that the action space range from [-1, 1] """
+        return np.array([-1]*self.num_nodes)

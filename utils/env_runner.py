@@ -31,11 +31,10 @@ class EnvRunner:
         # self.eval_interval = self.episode_length * 100
 
         self.env = env
-        self.num_agent = env.num_nodes
+        self.num_nodes = env.num_nodes
 
         # setup the agent 
         self.agent = self.setup_agent()
-        # self.recorder = Recorder(args, num_nodes=self.num_agent)
 
     def setup_agent(self):
         """Setup agent algorithm
@@ -50,11 +49,10 @@ class EnvRunner:
 
         env_config = {
             "num_nodes": self.env.num_nodes,
-            "dim_action": self.env.action_space,    # 5, since bonus range from [0,1,2,3,4]
-            "dim_observation": self.env.obs_spaces,  # Full observation (equals num_agents*dim_node_obs+num_edges*dim_edge_obs)
+            "dim_action": self.env.num_nodes,       # 5, since there are 5 nodes
+            "dim_observation": self.env.obs_spaces,  # Full observation (equals num_nodes*dim_node_obs+num_edges*dim_edge_obs)
             "dim_node_obs": self.env.dim_node_obs,  # node's observation 3, [idle drivers, upcoming cars, demands]
             "dim_edge_obs": self.env.dim_edge_obs,  # edge's observation 2, [edge_traffic, len_mat]
-            "discrete_action_space": self.env.action_space, # Same as "dim_action". (Used mainly in gym, thus herited here. But actually is useless)
             "edge_index": self.env.edge_index, 
             "len_mat": self.env.len_mat, 
         }
@@ -117,7 +115,6 @@ class EnvRunner:
             
             self.agent.append_transition(obs, action, reward_list[-1], done, obs_, info)
             if self.last_train_T == 0 or ((self.total_env_steps-self.last_train_T) / self.train_interval_episode >= 1):
-                # [self.agent.learn() for _ in range(3)]
                 self.agent.learn()
                 self.total_train_steps += 1
                 self.last_train_T = self.total_env_steps
@@ -126,16 +123,12 @@ class EnvRunner:
             #     self.last_hard_update_T = self.total_env_steps
             #     self.agent.hard_target_update()
 
-            # Record trajectory during steps
-            # self.recorder.record_info_step(obs, reward_list, action, self.env.games, self.env.nodes_action_result, self.env.sim_time_mat)
-
             obs = obs_
             self.total_env_steps += 1
             step += 1
 
             if np.all(done):
                 break
-        # self.recorder.record_info_episode(self.agent, self.env.games)
 
         return reward_traj, action_traj
 

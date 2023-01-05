@@ -36,19 +36,17 @@ def make_env(args):
         "edge_index": edge_index, 
         "dim_node_obs": 3,  # [idle drivers, upcoming cars, demands]
         "dim_edge_obs": 2,  # [traffic flow density, length]
-        "dim_action": 5,    # bonus range from [0,1,2,3,4]
-        "num_env_steps": args.num_env_steps,
         "episode_length": episode_length,   
 
         "initial_drivers": node_initial_cars,   # Initial idle drivers  [n_node * 1]
-        "node_demand": node_demand,     # Demands for each nodes, [EPISODE_LEN * n_node]
+        "node_demand": node_demand,             # Demands for each nodes, [EPISODE_LEN * n_node]
         "upcoming_cars": upcoming_cars,         # Initial upcoming cars [n_node * 1]
         "demand_distribution": node_distribute,     # Probability of demands distribute drivers to other nodes
-        "edge_traffic": edge_traffic,   # Traffic at each edges, [EPISODE_LEN * n_node * n_node]
+        "edge_traffic": edge_traffic,           # Traffic at each edges, [EPISODE_LEN * n_node * n_node]
         "len_vec": len_vec,
     }
 
-    return Env(env_config=env_config)
+    return Env(env_config=env_config, args=args)
 
 def get_demands_distribution(node_demand, adj_mat):
     """This function distribute the demands of each nodes

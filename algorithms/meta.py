@@ -15,29 +15,11 @@ class HeuristicPolicy(BaseAgent):
         self.cur_time_step = 0
 
     def append_transition(self, obs, action, reward, done, obs_, info):
-        self.cur_time_step = obs["time_step"]
-        nodes_actions = info[0]
-        self.nodes_policies[self.cur_time_step] = nodes_actions
+        pass
 
     def learn(self):
-        for episode_idx in range(self.episode_length):
-            for i in range(self.num_nodes):
-                if self.ratio_list[episode_idx][i] > 4:
-                    self.action[episode_idx][i] = 0
-                elif self.ratio_list[episode_idx][i] > 3:
-                    self.action[episode_idx][i] = 1
-                elif self.ratio_list[episode_idx][i] >2:
-                    self.action[episode_idx][i] = 2
-                elif self.ratio_list[episode_idx][i] > 1:
-                    self.action[episode_idx][i] = 3
-                else:
-                    self.action[episode_idx][i] = 4
-
+        pass
 
     def choose_action(self, obs, is_random):
         """ directly return [0]*num_nodes """
-        if is_random:
-            return np.random.random([self.num_nodes])*( self.max_bonus -self.min_bonus ) + self.min_bonus
-        else:
-            time_step = obs["time_step"]
-            return self.action[time_step]
+        pass

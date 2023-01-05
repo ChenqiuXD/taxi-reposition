@@ -3,7 +3,7 @@ import datetime
 import pickle
 
 class Recorder:
-    """ Recor necessary information. """
+    """ Record necessary information. """
     def __init__(self, all_args) -> None:
         now = datetime.datetime.now()
 
@@ -16,10 +16,6 @@ class Recorder:
                          + now.strftime("%m_%d_%H_%M")
 
     def record_init_settings(self, setting):
-        # setting: {"initial_drivers": self.env_config["initial_drivers"], 
-        #  "upcoming_cars": self.env_config["upcoming_cars"], 
-        #  "demands": self.env_config["node_demand"], 
-        #  "edge_traffic": self.env_config["edge_traffic"]}
         self.init_setting = setting
 
     def record(self, reward_list, action_list, nodes_actions, idle_drivers):
