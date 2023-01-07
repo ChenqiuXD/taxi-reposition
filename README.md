@@ -14,9 +14,13 @@ This is a repository used in the project "Incentive Design for driver-reposition
 ## Result example: 
 For the method `null`, we display two graphs: the first is the reward trajectory, the second is the drivers / demands ratio and bonuses design trajectory.  
 > reward trajectory  
-  ![Alt text](https://github.com/ChenqiuXD/taxi-reposition/blob/master/imgs/cost_traj.png)  
+  <!-- ![Alt text](https://github.com/ChenqiuXD/taxi-reposition/blob/master/imgs/cost_traj.png)   -->
+
+  <img src="https://github.com/ChenqiuXD/taxi-reposition/blob/master/imgs/cost_traj.png" aling=center width="50 />  
+
 > ratio and bonuses trajectory  
-  ![Alt text](https://github.com/ChenqiuXD/taxi-reposition/blob/master/imgs/idle_drivers.png)
+  <!-- ![Alt text](https://github.com/ChenqiuXD/taxi-reposition/blob/master/imgs/idle_drivers.png) -->
+  <img src="https://github.com/ChenqiuXD/taxi-reposition/blob/master/imgs/idle_drivers.png", align=center width=50 />
 
 ## Packages required
 pytorch 1.10.x   
