@@ -28,6 +28,8 @@ class Env:
         # flag of whether reset
         self.is_reset = False
 
+        self.output_path = args.output_path
+
         # Drivers' Game, used to simulate the payoff
         setting = {
             "num_nodes": self.num_nodes,  
@@ -165,7 +167,7 @@ class Env:
 
         # Calculate comprehensive cost
         overall_cost = (0.4*idle_cost + 0.4*avg_travelling_cost + 0.2*bonuses_cost) # Bonuses_cost would not be included temporarily. 
-        print("costs are: {}".format([idle_cost, avg_travelling_cost, bonuses_cost]))
+        # print("costs are: {}".format([idle_cost, avg_travelling_cost, bonuses_cost]))
 
         return np.array([-idle_cost, -avg_travelling_cost, -bonuses_cost, -overall_cost])*10  + 10
 
@@ -198,3 +200,7 @@ class Env:
                  "upcoming_cars": self.env_config["upcoming_cars"], 
                  "demands": self.env_config["node_demand"], 
                  "edge_traffic": self.env_config["edge_traffic"]}
+
+    def save_model(self):
+        """ Save nodes' policies, init_settings """
+        pass

@@ -2,15 +2,18 @@ import numpy as np
 import datetime
 import pickle
 
+import os
+
 class Recorder:
     """ Record necessary information. """
     def __init__(self, all_args) -> None:
-        now = datetime.datetime.now()
+        self.output_path = all_args.output_path
 
         self.num_env_steps = all_args.num_env_steps
         self.episode_length = all_args.episode_length
         self.cnt = 0 
 
+        now = datetime.datetime.now()
         self.file_name = all_args.algorithm_name \
                          + "_episodes_{}_length_{}_seed_{}_".format(self.num_env_steps, self.episode_length, all_args.seed)\
                          + now.strftime("%m_%d_%H_%M")
@@ -38,13 +41,15 @@ class Recorder:
             raise RuntimeError("The recorder's cnt exceeds num_env_steps")
 
     def store_data(self):
-        with open(self.file_name, 'wb') as f:
-            data = {
-                "init_setting": self.init_setting, 
-                "reward_traj": self.reward_traj, 
-                "bonus_traj": self.bonus_traj, 
-                "nodes_actions_traj": self.nodes_actions_traj, 
-                "idle_drivers_traj": self.idle_drivers_traj
-            }
+        data = {
+            "init_setting": self.init_setting, 
+            "reward_traj": self.reward_traj, 
+            "bonus_traj": self.bonus_traj, 
+            "nodes_actions_traj": self.nodes_actions_traj, 
+            "idle_drivers_traj": self.idle_drivers_traj
+        }
+        with open(os.path.join(self.output_path, self.file_name), 'wb') as f:
             pickle.dump(data, f)
-        print("Saved file: " + self.file_name)
+        print("Saved file: " + self.output_path)
+
+        return data

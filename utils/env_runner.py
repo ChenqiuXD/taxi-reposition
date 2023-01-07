@@ -9,6 +9,8 @@ class EnvRunner:
         self.args = args
         self.device = args.device
 
+        self.warmup_methods = ['ddpg', 'dqn']
+
         # set tunable hyper-parameters
         self.algorithm_name = self.args.algorithm_name
         self.num_env_steps = self.args.num_env_steps
@@ -44,6 +46,8 @@ class EnvRunner:
             from algorithms.null import NullPolicy as Algo
         elif self.algorithm_name == 'heuristic':
             from algorithms.heuristic import HeuristicPolicy as Algo
+        elif self.algorithm_name == 'ddpg':
+            from algorithms.ddpg.ddpg import DDPG as Algo
         else:
             raise NotImplementedError("The method " + self.algorithm_name + " is not implemented. Please check env_runner.py line 40 to see whether your method is added to the setup_agent function ")
 
@@ -62,10 +66,10 @@ class EnvRunner:
         """Fill up agents' replay buffer"""
         # Warmup the environment first
         print("Warming up the drivers")
-        for _ in range(self.args.max_warmup_steps):
+        for _ in range(self.args.warmup_steps):
             obs = self.env.reset()
             while True:
-                action = np.zeros(self.num_agent)
+                action = np.zeros(self.num_nodes)
                 obs_, reward_list, done, info = self.env.step(action, is_warmup=False)  # Assign false to make drivers update policies. 
                 obs = obs_
                 if done:
@@ -77,13 +81,13 @@ class EnvRunner:
             return
 
         print("Currently warming up")
-        episode_num = int(self.args.buffer_size/self.episode_length)+1
+        episode_num = int(self.args.buffer_size / self.episode_length)+1
         for i in range(episode_num):
             obs = self.env.reset()
             num_steps = self.episode_length if episode_num!=1 else self.args.buffer_size
             for j in range(num_steps):
                 # action = self.agent.choose_action(obs, is_random=True)
-                action = np.zeros(self.num_agent)
+                action = np.zeros(self.num_nodes)
                 obs_, reward_list, done, info = self.env.step(action, is_warmup=True)
                 self.agent.append_transition(obs, action, reward_list[-1], done, obs_, info)
                 obs = obs_
@@ -106,7 +110,7 @@ class EnvRunner:
             if self.args.render:
                 self.env.render(mode="not_human")
 
-            action = self.agent.choose_action(obs, is_random=False)
+            action = self.agent.choose_action(obs)
             action = self.normalize_actions(action)
             obs_, reward_list, done, info = self.env.step(action)  # reward_list : [idle_prob, avg_travelling_cost, bonuses_cost, overall_cost](+,+,+,-) only the last one is minus
             print("At step", step, " agent choose action ", action)
@@ -140,7 +144,8 @@ class EnvRunner:
 
     def store_data(self):
         """This function store necessary data"""
-        pass
+        self.agent.save_model(self.args.output_path)
+        self.env.save_model()
 
     def restore(self, isEval=False):
         pass

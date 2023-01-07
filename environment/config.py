@@ -7,7 +7,7 @@ def get_config():
 
     # prepare parameters
     parser.add_argument("--algorithm_name", type=str, default="rmatd3", choices=[
-                        'null', 'random', 'heuristic', 'DDPG', 'metaGrad', 'direct'])
+                        'null', 'heuristic', 'ddpg', 'metaGrad', 'direct'])
     parser.add_argument("--experiment_name", type=str, default="check")
     parser.add_argument("--seed", type=int, default=1,
                         help="Random seed for numpy/torch")
@@ -36,6 +36,8 @@ def get_config():
                         default=80, help="Max length for any episode")
     parser.add_argument('--buffer_size', type=int, default=5000,
                         help="Max # of transitions that replay buffer can contain")
+    parser.add_argument('--batch_size', type=int, default=64,
+                        help="Number of data contained in a batch during one iteration")
     parser.add_argument('--use_reward_normalization', action='store_true',
                         default=False, help="Whether to normalize rewards in replay buffer")
     parser.add_argument('--use_popart', action='store_true', default=False,
@@ -109,10 +111,6 @@ def get_config():
     parser.add_argument("--weight_decay", type=float, default=0)
 
     # algo common parameters
-    parser.add_argument('--batch_size', type=int, default=32,
-                        help="Number of buffer transitions to train on at once")
-    parser.add_argument('--gamma', type=float, default=1,
-                        help="Discount factor for env")
     parser.add_argument("--use_max_grad_norm",
                         action='store_false', default=True)
     parser.add_argument("--max_grad_norm", type=float, default=10.0,
@@ -124,8 +122,6 @@ def get_config():
     # soft update parameters
     parser.add_argument('--use_soft_update', action='store_false',
                         default=True, help="Whether to use soft update")
-    parser.add_argument('--tau', type=float, default=0.005,
-                        help="Polyak update rate")
     # hard update parameters
     parser.add_argument('--hard_update_interval_episode', type=int, default=200,
                         help="After how many episodes the lagging target should be updated")

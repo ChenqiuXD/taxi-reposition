@@ -34,7 +34,6 @@ class HeuristicPolicy(BaseAgent):
                 else:
                     self.action[time_step][i] = 1
 
-
     def choose_action(self, obs, is_random):
         """ directly return [0]*num_nodes """
         if is_random:

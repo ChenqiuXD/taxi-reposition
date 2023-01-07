@@ -26,26 +26,32 @@ class BaseAgent:
         self.buffer_ptr = 0
 
     def learn(self):
+        """ Agent learns to adapt the bonuses policy """
         pass
 
     def warmup(self):
+        """ Agents collect transitions to fill the buffer """
         pass
     
     def prep_train(self):
+        """ Call net.train() to prepare the network for training """
         pass
     
     def prep_eval(self):
+        """ Call net.eval() to prepare the network for evaluation """
         pass
     
     def hard_target_update(self):
+        """ Copying the target network from training network """
         pass
 
-    def save_network(self):
+    def save_model(self):
+        """ Save neural network """
         pass
 
     def append_transition(self, obs, action, reward, done, obs_, info):
-        """Store transition"""
-        pass
+        """ Store transition """
+        raise NotImplementedError("The agent does not implement the append_transition method. ")
 
     def choose_action(self, obs, is_random=False):
         """
@@ -53,4 +59,4 @@ class BaseAgent:
         :param obs: observation [1, 3*self.dim_obs]
         :param is_random: (bool) whether randomly choose action
         """
-        pass
+        raise NotImplementedError("The agent does not implement the choose_action method. ")
