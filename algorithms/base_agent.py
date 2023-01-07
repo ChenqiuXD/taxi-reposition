@@ -45,7 +45,7 @@ class BaseAgent:
         """ Copying the target network from training network """
         pass
 
-    def save_model(self):
+    def save_model(self, output):
         """ Save neural network """
         pass
 

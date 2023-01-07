@@ -8,6 +8,10 @@ class NullPolicy(BaseAgent):
 
         self.num_nodes = env_config["num_nodes"]
 
-    def choose_action(self, obs, is_random):
+    def choose_action(self, obs, is_random=False):
         """ directly return [-1]*num_nodes. Note that the action space range from [-1, 1] """
         return np.array([-1]*self.num_nodes)
+
+    def append_transition(self, obs, action, reward, done, obs_, info):
+        """ To avoid NotImplementError """
+        pass

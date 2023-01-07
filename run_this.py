@@ -82,8 +82,8 @@ def main(args):
             idle_drivers = [env.games[i].get_state() for i in range(len(env.games))]
             recorder.record(reward_list, action_list, nodes_actions, idle_drivers)
         data = recorder.store_data()
-        runner.store_data()
         plot_result(all_args, data)
+        runner.store_data()
     elif all_args.mode=="test":
         pass
     else:
