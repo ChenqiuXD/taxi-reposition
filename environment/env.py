@@ -78,13 +78,13 @@ class Env:
         # agents choose actions
         time_step = self.cur_state["time_step"]
         self.games[time_step].update_state(self.cur_state)
-        nodes_actions = (self.games[time_step].choose_actions()).astype(int)
-        self.nodes_action_result = np.maximum(0, nodes_actions) # 
+        # nodes_actions = (self.games[time_step].choose_actions()).astype(int)
+        nodes_actions = self.games[time_step].choose_actions()
 
         # Simulate and observe payoff
         time_mat = self.get_time_mat(self.cur_state["len_mat"], self.cur_state["edge_traffic"], self.adj_mat)
-        self.sim_time_mat = time_mat
 
+        # TODO: if we delete the warmup of agent, this 'if' is unnecessary. 
         if not is_warmup:   # While warming up, keep the policies of nodes unchanged. 
             payoff = self.games[time_step].observe_payoff(actions, time_mat, nodes_actions)
             self.games[time_step].update_policy(payoff)
@@ -116,7 +116,7 @@ class Env:
         # }
 
         # --------------------------------------------------------------------------------------------------------------------------------------------
-        #   Made the arrival cars would not minus the demands. And the upcoming cars would be zero all the times. 
+        #   TODO: Made the arrival cars would not minus the demands. And the upcoming cars would be zero all the times. 
         # --------------------------------------------------------------------------------------------------------------------------------------------
 
         next_state = {
@@ -166,7 +166,7 @@ class Env:
         bonuses_cost *= norm_factor['bonus_cost']
 
         # Calculate comprehensive cost
-        overall_cost = (0.4*idle_cost + 0.4*avg_travelling_cost + 0.2*bonuses_cost) # Bonuses_cost would not be included temporarily. 
+        overall_cost = (0.4*idle_cost + 0.0*avg_travelling_cost + 0.0*bonuses_cost) # Bonuses_cost would not be included temporarily. 
         # print("costs are: {}".format([idle_cost, avg_travelling_cost, bonuses_cost]))
 
         return np.array([-idle_cost, -avg_travelling_cost, -bonuses_cost, -overall_cost])*10  + 10
@@ -187,12 +187,9 @@ class Env:
                     time_mat[i,j] = traffic[i,j]/100.0*len_mat[i,j]/100.0 
         return time_mat
 
-    def get_nodes_actions(self):
+    def get_nodes_actions(self, step):
         """ Returns the nodes_actions currently """
-        nodes_actions = np.zeros([self.episode_length, self.num_nodes, self.num_nodes])
-        for i in range(self.episode_length):
-                nodes_actions[i] =  self.games[i].get_nodes_actions()
-        return nodes_actions
+        return self.games[step].get_nodes_actions()
     
     def get_init_setting(self):
         """ Return init settings """
@@ -200,7 +197,3 @@ class Env:
                  "upcoming_cars": self.env_config["upcoming_cars"], 
                  "demands": self.env_config["node_demand"], 
                  "edge_traffic": self.env_config["edge_traffic"]}
-
-    def save_model(self):
-        """ Save nodes' policies, init_settings """
-        pass

@@ -19,20 +19,17 @@ def get_edge_index(edge_traffic):
 
 def plot_result(all_args, result):
     # ------------------------------------------------------------------------------------------------
-    # Suggested result: 
-    # ./heuristic_episodes_80_length_6 - step_cnt=2
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     # PLEASE CHANGE PLOT_TYPE before plotting. 
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     # ------------------------------------------------------------------------------------------------
     # Load result
     output_path = all_args.output_path
-    num_step = 1    # The number of step to plot in episodes
+    num_step = 0    # The number of step to plot in episodes
 
     plot_type = {
         "idle_drivers": 1,
         "cost_traj": 1,
-        "value_table": 0,
         "travelling_time": 0
     }
 
@@ -62,7 +59,7 @@ def plot_result(all_args, result):
         #                     result[episode_idx][num_step]["obs"]["upcoming_cars"])[i]  for i in range(num_nodes) ] for episode_idx in range(result_length) ]
         # ratio = (data_demands+data_idle_drivers) / data_demands
         data_demands = np.array( [result['init_setting']['demands'][num_step]]*result_length )
-        data_idle_drivers = np.array([ result["idle_drivers_traj"][episode_idx][num_step+1] for episode_idx in range(result_length) ])
+        data_idle_drivers = np.array([ result["idle_drivers_traj"][episode_idx][num_step] for episode_idx in range(result_length) ])
         ratio = data_idle_drivers / data_demands
 
         # Plot result for each node
@@ -115,86 +112,7 @@ def plot_result(all_args, result):
             plt.savefig(os.path.join(output_path, "cost_traj.png"))
 
     # -------------------------------------------------------------------------------------------------------
-    # 3 node's value table
-    # -------------------------------------------------------------------------------------------------------
-    # if plot_type["value_table"]:
-    #     plt.figure(figsize=[35, 15])
-    #     # Plot nodes' values
-    #     x = range(result_length)
-    #     for i in range(num_nodes):
-    #         plt.subplot(3,5,i+1)
-    #         for j in range(num_nodes):
-    #             if j in edge_index[1, edge_index[0]==i]:
-    #                 plt.plot(np.arange(result_length), 
-    #                         np.array([ result[k][num_step]['nodes value'][i, j] for k in range(result_length)]),
-    #                         label="to node %d"%j, color=colors[j])
-    #         plt.xlabel("episodes")                 
-    #         plt.ylabel("value table")
-    #         plt.legend(loc="upper right")
-
-    #     # Plot nodes' actions
-    #     x = range(result_length)
-    #     for i in range(num_nodes):
-    #         plt.subplot(3,5,5+i+1)
-    #         for j in range(num_nodes):
-    #             if j in edge_index[1, edge_index[0]==i]:
-    #                 plt.plot(np.arange(result_length), 
-    #                         np.array([ result[k][num_step]['nodes actions'][i, j] for k in range(result_length)]), 
-    #                         label="to node %d"%j, color=colors[j])
-    #         plt.xlabel("episodes")                 
-    #         plt.ylabel("nodes'actions")
-    #         plt.legend(loc="upper right")
-
-    #     # Plot the trend of idle drivers
-    #     plt.subplot(3,5,11)
-    #     for i in range(num_nodes):
-    #         plt.plot(np.arange(result_length),
-    #                 # obs at num_step+1 could represent the effect of nodes actions at num_step
-    #                 np.array([ (result[k][num_step]['obs']['upcoming_cars']+
-    #                             np.sum(result[k][num_step]["nodes actions"], axis=0)-
-    #                             result[k][num_step]['obs']["demands"])[i] for k in range(result_length) ]), 
-    #                 label="node %d"%i, color=colors[i])
-
-    #         plt.plot(np.arange(result_length), 
-    #                 np.array([ result[k][num_step]['obs']['demands'][i] for k in range(result_length) ]), 
-    #                 label="demands %d"%i, color=colors[i], linestyle='--', alpha=0.5)
-            
-    #         plt.xlabel("episodes")
-    #         plt.ylabel("num of idle drivers")
-    #         plt.legend(loc="upper right")
-
-    #     # Plot the frame of original data
-    #     plt.subplot(3,5,12)
-    #     cols = ["node {}".format(str(i)) for i in range(num_nodes)]
-    #     rows = ["demands", "upcoming cars", "traffic"]
-    #     # Obtain data
-    #     data = [[0]*num_nodes] * len(rows)
-    #     # data[0] = list(self.node_init_car)
-    #     data[0] = list(result[0][num_step]['obs']["demands"])
-    #     data[1] = list(result[0][num_step]['obs']["upcoming_cars"])
-    #     # traffic = list(re.sub(' +', ' ', str(result[0][num_step]['obs']["edge_traffic"][i]))[1:-1] for i in range(num_nodes))
-    #     # traffic = [re.sub(' ', '\n', traffic[i]).lstrip().rstrip() for i in range(num_nodes)]
-    #     # data[2] = traffic
-    #     tab = plt.table(cellText=data, colLabels=cols, rowLabels=rows, loc='center')
-    #     tab.auto_set_font_size(False)
-    #     tab.set_fontsize(10)    
-
-    #     # Assign the height of last rows
-    #     cell_dict = tab.get_celld()
-    #     for i in range(len(cols)):
-    #         cell_dict[(len(rows),i)]._height = 0.4
-    #         for j in range(len(rows)+1):
-    #             cell_dict[(j, i)]._width = 0.15
-
-    #     plt.suptitle("value table, nodes actions at step {} and idle_drivers at step {}".format(num_step,num_step+1), fontsize='xx-large')
-    #     plt.axis('tight')
-    #     plt.axis('off')
-    #     plt.savefig(file_name[2:]+"_value_table_traj.png")
-
-
-
-    # -------------------------------------------------------------------------------------------------------
-    # 4 time_mat plot
+    # 3 time_mat plot
     # -------------------------------------------------------------------------------------------------------
     # if plot_type["travelling_time"]:
     #     fig = plt.figure(figsize=[15,10])
@@ -212,3 +130,6 @@ def plot_result(all_args, result):
 
     print("done")
 
+if __name__ == "__main__":
+    # TODO: Please write this function to plot steps of assigned steps. 
+    pass

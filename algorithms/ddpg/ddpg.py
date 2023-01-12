@@ -1,22 +1,20 @@
 
 import numpy as np
-
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.optim import Adam
 
 from algorithms.ddpg.model import (Actor, Critic)
-# from memory import SequentialMemory
 from algorithms.ddpg.random_process import OrnsteinUhlenbeckProcess
 from algorithms.ddpg.util import *
 from algorithms.base_agent import BaseAgent
-
-# from ipdb import set_trace as debug
 
 criterion = nn.MSELoss()
 
 class DDPG(BaseAgent):
     def __init__(self, args, env_config):
+        super().__init__(args, env_config)
         self.args = args
         if str(args.device) == 'cuda':
             self.use_cuda = True
@@ -25,6 +23,8 @@ class DDPG(BaseAgent):
 
         self.nb_states = 2 * env_config["num_nodes"]    # State vector's dimension
         self.nb_actions= env_config["num_nodes"]        # Action vector's dimension
+        self.max_bonus = args.max_bonus
+        self.min_bonus = args.min_bonus
         
         # Create Actor and Critic Network
         net_cfg = {
@@ -40,28 +40,27 @@ class DDPG(BaseAgent):
         self.critic_target = Critic(self.nb_states, self.nb_actions, **net_cfg)
         self.critic_optim  = Adam(self.critic.parameters(), lr=args.lr*3)
 
-        hard_update(self.actor_target, self.actor) # Make sure target is with the same weight
+        hard_update(self.actor_target, self.actor)      # Copy weight to target network
         hard_update(self.critic_target, self.critic)
         
         #Create replay buffer
-        # self.memory = SequentialMemory(limit=args.rmsize, window_length=args.window_length)
         self.buffer_size = args.buffer_size
         self.batch_size = args.batch_size
         self.buffer_ptr = 0
         self.buffer = np.zeros([self.buffer_size, 2*self.nb_states+self.nb_actions+2])  # each transition is [s,a,r,s',d] where d represents done
         self.random_process = OrnsteinUhlenbeckProcess(size=self.nb_actions, theta=0.15, mu=0., sigma=0.01)
-        self.buffer_high = 0
+        self.buffer_high = 0    # Used to mark the appended buffer (avoid training with un-appended sample indexes)
 
         # Hyper-parameters
         self.tau = args.tau
         self.discount = args.gamma
         self.depsilon = 1.0 / args.epsilon
 
-        # 
+        # Randomness parameters
         self.epsilon = 1.0
         self.is_training = True
 
-        # 
+        # cuda
         if self.use_cuda: self.cuda()
 
     def append_transition(self, s, a, r, d, s_, info):
@@ -69,57 +68,60 @@ class DDPG(BaseAgent):
             self.buffer_ptr = 0
         self.buffer[self.buffer_ptr] = np.concatenate([self.s2obs(s), a, [r], self.s2obs(s_), [d]])
         self.buffer_ptr += 1
-        self.buffer_high = np.minimum( self.buffer_high+1, self.buffer_size-1 )
-
-    def sample_data(self):
-        sample_index = np.random.choice( self.buffer_high, self.batch_size )
-        batch_memory = self.buffer[sample_index, :]
-        batch_state = batch_memory[:, :self.nb_states]
-        batch_actions = batch_memory[:, self.nb_states:self.nb_states+self.nb_actions]
-        batch_rewards = batch_memory[:, self.nb_states+self.nb_actions+1:self.nb_states+self.nb_actions+2]
-        batch_next_state = batch_memory[:, -self.nb_states-1:-1]
-        batch_done = 1 - batch_memory[:, -1]
-        return batch_state, batch_actions, batch_rewards, batch_next_state, batch_done
+        self.buffer_high = np.minimum( self.buffer_high+1, self.buffer_size )
+        # Buffer_high would not exceeds so that sample_index in sample_data() would reamin in self.buffer
 
     def learn(self):
+        self.prep_train()
         # Sample batch
-        state_batch, action_batch, reward_batch, \
-        next_state_batch, terminal_batch = self.sample_data()
+        try:
+            sample_index = np.random.choice( self.buffer_high, self.batch_size )
+            batch_memory = self.buffer[sample_index, :]
+            batch_state = batch_memory[:, :self.nb_states]
+            batch_actions = batch_memory[:, self.nb_states:self.nb_states+self.nb_actions]
+            batch_rewards = batch_memory[:, self.nb_states+self.nb_actions+1:self.nb_states+self.nb_actions+2]
+            batch_next_state = batch_memory[:, -self.nb_states-1:-1]
+            batch_done = 1 - batch_memory[:, -1]
+        except:
+            raise RuntimeError("Sample wrong, comes from the ddpg.py learn() function")
 
-        # Prepare for the target q batch
+        # Calculate target q values
         next_q_values = self.critic_target([
-            to_tensor(next_state_batch, volatile=True),
-            self.actor_target(to_tensor(next_state_batch, volatile=True)),
+            to_tensor(batch_next_state, volatile=True),
+            self.actor_target(to_tensor(batch_next_state, volatile=True)),
         ])
         next_q_values.volatile=False
+        target_q_batch = to_tensor(batch_rewards) + \
+            self.discount*to_tensor(batch_done.astype(np.float))*next_q_values.detach()
 
-        target_q_batch = to_tensor(reward_batch) + \
-            self.discount*to_tensor(terminal_batch.astype(np.float))*next_q_values
-
-        # Critic update
-        self.critic.zero_grad()
-
-        q_batch = self.critic([ to_tensor(state_batch), to_tensor(action_batch) ])
+        # Curr q values
+        q_batch = self.critic([ to_tensor(batch_state), to_tensor(batch_actions) ])
         
-        value_loss = criterion(q_batch, target_q_batch)
+        # Update critic
+        value_loss = F.mse_loss(q_batch, target_q_batch)
+        self.critic_optim.zero_grad()
         value_loss.backward()
         self.critic_optim.step()
 
-        # Actor update
-        self.actor.zero_grad()
-
+        # Actor loss
         policy_loss = -self.critic([
-            to_tensor(state_batch),
-            self.actor(to_tensor(state_batch))
+            to_tensor(batch_state),
+            self.actor(to_tensor(batch_state))
         ])
 
+        # Update actor
         policy_loss = policy_loss.mean()
+        self.actor_optim.zero_grad()
         policy_loss.backward()
         self.actor_optim.step()
 
         # Target update
         soft_update(self.actor_target, self.actor, self.tau)
         soft_update(self.critic_target, self.critic, self.tau)
+
+    def prep_train(self):
+        self.actor.train()
+        self.critic.train()
 
     def eval(self):
         self.actor.eval()
@@ -138,12 +140,9 @@ class DDPG(BaseAgent):
         if is_random:
             action = np.random.uniform(-1., 1., self.nb_actions)
         else:
-            # action = to_numpy(
-            #     self.actor(to_tensor(obs))
-            # ).squeeze(0)
             action = to_numpy( self.actor(to_tensor(obs)) )
             action += self.is_training*max(self.epsilon, 0)*self.random_process.sample()
-            action = np.clip(action, -1., 1.)
+            action = ( np.clip(action, -1., 1.) - (-1) ) * (self.max_bonus-self.min_bonus) + self.min_bonus # Normalize the action to [min_bonus, max_bonus]
 
         self.epsilon -= self.depsilon
         
@@ -156,7 +155,7 @@ class DDPG(BaseAgent):
     def reset(self):
         self.random_process.reset_states()
 
-    def load_weights(self, output):
+    def load_model(self, output):
         if output is None: return
 
         self.actor.load_state_dict(

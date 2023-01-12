@@ -8,14 +8,14 @@ from utils.make_env import make_env
 from environment.config import get_config
 from utils.recorder import Recorder
 from utils.get_output_folder import get_output_folder
-from utils.plot import plot_result
 
 def parse_args(args, parser):
     """ Add arguments to the 'args' variable """
     parser.add_argument('--epsilon', type=float, default=0.9, help="Epsilon greedy")
     parser.add_argument('--tau', type=float, default=1e-3, help="Learning rate for the soft update")
     parser.add_argument('--gamma', type=float, default=0.99, help="Discount factor")
-    parser.add_argument('--mode', type=str, default="train", help='train or test')
+    parser.add_argument('--mode', type=str, default="train", help='train, test')
+    parser.add_argument('--continue_num', type=int, default=0, help='if mode is continue, then load network parameters from this run_(continue_num)')
     parser.add_argument('--warmup_steps', type=int, default=100, help='drivers warmup episodes')
     parser.add_argument('--render', action="store_false", default=True, help='Render or not')
 
@@ -38,19 +38,12 @@ def main(args):
 
     # set seeds
     # torch.manual_seed(all_args.seed)
-    # torch.cuda.manual_seed_all(arser)
-    all_args.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print("Current using ", all_args.device)
-    print("Render is ", all_args.render)
-
-    # set seeds
-    # torch.manual_seed(all_args.seed)
     # torch.cuda.manual_seed_all(all_args.seed)
     np.random.seed(all_args.seed)
 
     # Get save path
     if all_args.mode == 'train':
-        all_args.output_path = get_output_folder(all_args.algorithm_name)
+        all_args.output_path = get_output_folder(all_args.algorithm_name, mode=all_args.mode, continue_num=all_args.continue_num)
     elif all_args.mode == 'test':
         pass
 
@@ -61,28 +54,20 @@ def main(args):
 
     # Choose algorithm to use
     print("Using policy: ", all_args.algorithm_name)
-    runner = EnvRunner(all_args, env)
+    runner = EnvRunner(all_args, env, recorder)
 
     # Train the agent
-    reward_result_list = []
-    if all_args.mode=="train":  # for training agents
+    # reward_result_list = []
+    if all_args.mode=="train" or all_args.mode=="continue":  # for training agents
         total_num_steps = 0
         
-        # Warmup to fill the buffer
         runner.warmup()
         while total_num_steps < all_args.num_env_steps:
-            reward_list, action_list = runner.run()
+            reward_list = runner.run()
             total_num_steps += 1
             print("---------------------------------------------------------------------------------------------------")
             print("At episode ", total_num_steps, " reward sum is: ", np.sum([reward_list[i][-1] for i in range(len(reward_list))]))
             print("---------------------------------------------------------------------------------------------------\n\n\n")
-            reward_result_list.append(np.sum(reward_list))
-
-            nodes_actions = env.get_nodes_actions()
-            idle_drivers = [env.games[i].get_state() for i in range(len(env.games))]
-            recorder.record(reward_list, action_list, nodes_actions, idle_drivers)
-        data = recorder.store_data()
-        plot_result(all_args, data)
         runner.store_data()
     elif all_args.mode=="test":
         pass
@@ -91,14 +76,14 @@ def main(args):
 
 
 if __name__ == "__main__":
-    # Options: null, random, heuristic, DDPG, metaGrad, direct
-    algo = 'ddpg'
+    # Options: null, heuristic, ddpg(TODO), direct(TODO)
+    algo = 'direct'
 
-    input_args = ['--algorithm_name', algo, '--seed', '35', '--mode', 'train', 
-                  '--episode_length', '6', '--min_bonus', '0', '--max_bonus', '5', '--lr_drivers', '1e-3',
-                  '--warmup_steps', '2000', '--num_env_steps', '10000', 
-                  '--lr', '1e-4', '--tau', '1e-3', '--buffer_size', '16', '--batch_size', '4', 
-                  '--render']
+    # To continue training, please assign 'continue_num' to the run number in 'output' folder you would like to continue training. 
+    input_args = ['--algorithm_name', algo, '--seed', '15', '--mode', 'train',  
+                  '--episode_length', '6', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-3',
+                  '--warmup_steps', '1000', '--num_env_steps', '2000', 
+                  '--lr', '1e-3', '--tau', '1e-3', '--buffer_size', '64', '--batch_size', '16', '--continue_num', '3',]
 
     # Check if there are input from system, then run the command.
     if sys.argv[1:]:

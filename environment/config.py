@@ -6,8 +6,8 @@ def get_config():
         description="OFF-POLICY", formatter_class=argparse.RawDescriptionHelpFormatter)
 
     # prepare parameters
-    parser.add_argument("--algorithm_name", type=str, default="rmatd3", choices=[
-                        'null', 'heuristic', 'ddpg', 'metaGrad', 'direct'])
+    parser.add_argument("--algorithm_name", type=str, default="null", choices=[
+                        'null', 'heuristic', 'ddpg', 'direct'])
     parser.add_argument("--experiment_name", type=str, default="check")
     parser.add_argument("--seed", type=int, default=1,
                         help="Random seed for numpy/torch")
@@ -86,7 +86,6 @@ def get_config():
                         default=True, help='Whether to use a recurrent policy')
     parser.add_argument("--use_naive_recurrent_policy", action='store_false',
                         default=True, help='Whether to use a naive recurrent policy')
-    # TODO now only 1 is support
     parser.add_argument("--recurrent_N", type=int, default=1)
     parser.add_argument('--data_chunk_length', type=int, default=80,
                         help="Time length of chunks used to train via BPTT")
@@ -183,8 +182,5 @@ def get_config():
     # log parameters
     parser.add_argument('--log_interval', type=int, default=1000,
                         help="After how many episodes of training the policy model should be saved")
-
-    # pretained parameters
-    parser.add_argument("--model_dir", type=str, default=None)
 
     return parser

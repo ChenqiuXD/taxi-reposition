@@ -1,13 +1,15 @@
 import numpy as np
-# from recorder import Recorder
-import pickle
+import math
+from utils.plot import plot_result
+
 
 class EnvRunner:
     """Environment runner for overall simulation."""
-    def __init__(self, args, env):
+    def __init__(self, args, env, recorder):
         # non-tunable hyper-parameters
         self.args = args
         self.device = args.device
+        self.recorder = recorder
 
         self.warmup_methods = ['ddpg', 'dqn']
 
@@ -48,6 +50,8 @@ class EnvRunner:
             from algorithms.heuristic import HeuristicPolicy as Algo
         elif self.algorithm_name == 'ddpg':
             from algorithms.ddpg.ddpg import DDPG as Algo
+        elif self.algorithm_name == 'direct':
+            from algorithms.direct import DirectPolicy as Algo
         else:
             raise NotImplementedError("The method " + self.algorithm_name + " is not implemented. Please check env_runner.py line 40 to see whether your method is added to the setup_agent function ")
 
@@ -76,25 +80,28 @@ class EnvRunner:
                     obs = self.env.reset()
                     break
 
-        if self.algorithm_name not in self.warmup_methods:   # Other algorithms do not require warmup
-            print("algorithm {} do not require warmup. ".format(self.algorithm_name))
-            return
+        # TODO: think we do not need warmup, we can add a if-else in buffer.sample, if the size of buffer is smaller than batch_size, then continue without training. 
 
-        print("Currently warming up")
-        episode_num = int(self.args.buffer_size / self.episode_length)+1
-        for i in range(episode_num):
-            obs = self.env.reset()
-            num_steps = self.episode_length if episode_num!=1 else self.args.buffer_size
-            for j in range(num_steps):
-                # action = self.agent.choose_action(obs, is_random=True)
-                action = np.zeros(self.num_nodes)
-                obs_, reward_list, done, info = self.env.step(action, is_warmup=True)
-                self.agent.append_transition(obs, action, reward_list[-1], done, obs_, info)
-                obs = obs_
-                if np.all(done):
-                    obs = self.env.reset()
-                print("Episode {}/{}, iteration {}/{}".format(i+1, int(self.args.buffer_size/self.episode_length)+1, j+1, num_steps))
-        print("Finished warming up")
+        # if self.algorithm_name not in self.warmup_methods:   # Other algorithms do not require warmup
+        #     print("algorithm {} do not require warmup. ".format(self.algorithm_name))
+        #     return
+
+        # print("Currently warming up")
+        # episode_num = int(self.args.buffer_size / self.episode_length)+1
+        # for i in range(episode_num):
+        #     obs = self.env.reset()
+        #     num_steps = self.episode_length if episode_num!=1 else self.args.buffer_size
+        #     for j in range(num_steps):
+        #         action = self.agent.choose_action(obs, is_random=True)
+        #         obs_, reward_list, done, info = self.env.step(action, is_warmup=False)
+        #         # action = np.array([self.env.min_bonus]*self.env.num_nodes)
+        #         # obs_, reward_list, done, info = self.env.step(action, is_warmup=True)
+        #         self.agent.append_transition(obs, action, reward_list[-1], done, obs_, info)
+        #         obs = obs_
+        #         if np.all(done):
+        #             obs = self.env.reset()
+        #         print("Episode {}/{}, iteration {}/{}".format(i+1, int(self.args.buffer_size/self.episode_length)+1, j+1, num_steps))
+        # print("Finished warming up")
 
     def run(self):
         """Collect a training episode and perform training, saving, logging and evaluation steps"""
@@ -104,19 +111,27 @@ class EnvRunner:
         # initial observation
         obs = self.env.reset()
         reward_traj = []
-        action_traj = []
+        action_traj = np.zeros([self.episode_length, self.num_nodes])
+        nodes_actions_traj = np.zeros([self.episode_length, self.num_nodes, self.num_nodes])
+        idle_drivers_traj = np.zeros([self.episode_length, self.num_nodes])
         step = 0
         while step < self.episode_length:
-            if self.args.render:
-                self.env.render(mode="not_human")
+            # if self.args.render:
+            #     self.env.render(mode="not_human")
 
             action = self.agent.choose_action(obs)
-            action = self.normalize_actions(action)
+            if np.array([ math.isnan(val) for val in action ]).any():   # When code went wrong, the action might be nan
+                raise RuntimeError("Action is nan")
+                
             obs_, reward_list, done, info = self.env.step(action)  # reward_list : [idle_prob, avg_travelling_cost, bonuses_cost, overall_cost](+,+,+,-) only the last one is minus
             print("At step", step, " agent choose action ", action)
-            print("At step {}, costs are: idle_prob {}, travelling_cost {}, bonuses_cost {}".format(step, reward_list[0], reward_list[1], reward_list[2]) )
+            # print("At step {}, costs are: idle_prob {}, travelling_cost {}, bonuses_cost {}".format(step, reward_list[0], reward_list[1], reward_list[2]) )
+            
+            # Append to record list 
             reward_traj.append(reward_list)
-            action_traj.append(action)
+            action_traj[step] = action
+            nodes_actions_traj[step] = self.env.get_nodes_actions(step)
+            idle_drivers_traj[step] = obs_["idle_drivers"]
             
             self.agent.append_transition(obs, action, reward_list[-1], done, obs_, info)
             if self.last_train_T == 0 or ((self.total_env_steps-self.last_train_T) / self.train_interval_episode >= 1):
@@ -135,17 +150,12 @@ class EnvRunner:
             if np.all(done):
                 break
 
-        return reward_traj, action_traj
-
-    def normalize_actions(self, actions):
-        """ Normalize the actions from [-1, 1] to [min_bonus, max_bonus] """
-        k = (self.args.max_bonus - self.args.min_bonus) / (1-(-1))
-        return (actions-(-1))*k+self.args.min_bonus
+        self.recorder.record(reward_traj, action_traj, nodes_actions_traj, idle_drivers_traj)
+        return reward_traj
 
     def store_data(self):
         """This function store necessary data"""
         self.agent.save_model(self.args.output_path)
-        self.env.save_model()
 
-    def restore(self, isEval=False):
-        pass
+        data = self.recorder.store_data()
+        plot_result(self.args, data)

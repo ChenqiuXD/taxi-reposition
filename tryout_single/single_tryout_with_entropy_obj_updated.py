@@ -26,7 +26,7 @@ def get_L(policies, adj_matrix, idle_drivers, demands):
     for i in range(n_node):
         cnt_row = 0
         for j in range(n_node):
-            sub_mat = (1+(i==j)) * idle_drivers[j] * S[j][neighbour_list[j]][:, neighbour_list[i]]
+            sub_mat = (1+(i==j)) * idle_drivers[i] * S[j][neighbour_list[j]][:, neighbour_list[i]]
             L[cnt_row:cnt_row+n_neighbour[j], cnt_col:cnt_col+n_neighbour[i]] = sub_mat
             cnt_row += n_neighbour[j]
         for idx, neighbour_node in enumerate(neighbour_list[i]):
@@ -168,19 +168,13 @@ def simulate(MIN_BONUS, MAX_BONUS, demands, idle_drivers, adj_matrix, time_mat, 
                     idx = np.where(i==neighbour_list[j])[0][0]
                     update_term += ( np.log(cars_distribution[i]) + 1 -np.log(demands_distribution[i]) ) * cars_distribution[j] * nabla_y_x[:, index[j]+idx]
 
-            ## LEGACY!!! when the optimization criterion is the sum of cars_distribution
-            # for i in range(n_node):
-            #     for node in neighbour_list[i]:
-            #         idx = np.where(i==neighbour_list[node])[0][0]
-            #         update_term += (idle_drivers[node] * nabla_y_x[:, index[node]+idx]) / demands[i]
-
             bonuses -= lr_beta * update_term
             bonuses = np.maximum(MIN_BONUS, bonuses)
             bonuses = np.minimum(MAX_BONUS, bonuses)
+            # print("At iteration {}, bonuses are {}".format(t, bonuses))
+            # print("At iteration {}, payoff are: {}\n".format(t, payoff))
         elif policy_type == 'null':
             bonuses = np.zeros(5)
-        # elif policy_type == 'heuristic':
-        #     bonuses = (np.max(idle_cost) - idle_cost) / (np.max(idle_cost) - np.min(idle_cost)) * (MAX_BONUS - MIN_BONUS) + MIN_BONUS
         else:
             raise RuntimeError("The bonus_policy_type parameter {} does not correspond to any existing methods, please rechek.".format(policy_type))
         
@@ -193,12 +187,13 @@ if __name__ == "__main__":
     # Environment settings
     # demands = np.array([200,110,130,340,250])
     # idle_drivers = np.array([271,257,280,285,137])
-
     np.random.seed(15)
-    demands = np.random.random(5)
-    demands = demands / np.sum(demands) * 1000
-    idle_drivers = np.random.random(5)
-    idle_drivers = idle_drivers / np.sum(idle_drivers) * 1000
+    # demands = np.random.uniform(0.3, 1, [5]) * 1000
+    # demands = demands / np.sum(demands) * 1000
+    # idle_drivers = np.random.uniform(0.3, 1, [5]) * 1000
+    # idle_drivers = idle_drivers / np.sum(idle_drivers) * 1000
+    demands = np.array([[330.76929478, 157.29862111, 125.05191098, 204.5923836 , 182.28778954]])
+    idle_drivers = np.array([262.9904903 , 201.51229704, 201.11597336, 148.23837386, 186.14286545])
 
     adj_matrix = np.array([[1, 1, 0, 1, 1],
                            [1, 1, 1, 0, 1],
@@ -209,8 +204,8 @@ if __name__ == "__main__":
 
     # Hyper-parameters settings
     MIN_BONUS = 0
-    MAX_BONUS = 4
-    lr_alpha = 0.001 # learning rate for lower-level agents
+    MAX_BONUS = 100
+    lr_alpha = 5e-3 # learning rate for lower-level agents
     lr_beta =  1e-3    # learning rate for upper-level agent
     T = 10000        # Total simulation step
     T_inner = 1    # Lower-level agents update T_inner times, the upper agent would update once. 
@@ -218,6 +213,6 @@ if __name__ == "__main__":
     policy_type = ['grad', 'null']
     policy = 'grad'
     policies_traj, ratio_traj, bonuses_traj, obj_traj = simulate(MIN_BONUS, MAX_BONUS, demands, idle_drivers, 
-                                                                 adj_matrix, time_mat, T, T_inner, lr_alpha, lr_beta, policy_type=policy)
+                                                                adj_matrix, time_mat, T, T_inner, lr_alpha, lr_beta, policy_type=policy)
 
     plot_traj(adj_matrix, policies_traj, ratio_traj, bonuses_traj, obj_traj)

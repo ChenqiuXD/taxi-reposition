@@ -6,8 +6,6 @@ from environment.utils import softmax, get_adj_mat
 def make_env(args):
     
     """This function return an env which has similar functionality as gyms. """
-    # edge_index = np.array([[0,1,1,1,2,2,2,3,3,3,3,3,4,4,4,4,5,5,5,5,5,6,6,6,6,7,7,7,7,8,8],
-    #                        [2,2,3,4,0,1,3,1,2,4,5,6,1,3,6,7,2,3,6,7,8,3,4,5,7,4,5,8,6,5,7]])    # COO form of connection matrix
     edge_index = np.array([[0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 0, 1, 2, 3, 4], 
                            [1, 4, 3, 0, 4, 2, 1, 4, 3, 0, 4, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4]])
     num_nodes = np.max(edge_index) + 1
@@ -21,10 +19,9 @@ def make_env(args):
             len_vec[i] = 100 if edge_index[0,i]==4 or edge_index[1,i]==4 else 141.4
 
     # Randomly generate some data
-
     episode_length = args.episode_length
     normalize = lambda arr: arr/np.sum(arr)
-    node_initial_cars = normalize( np.random.uniform(0.2, 1, num_nodes ) )*1000
+    node_initial_cars = normalize( np.random.uniform(0.2, 1, num_nodes) ) * 1000
     node_demand = np.vstack( [ normalize(np.random.uniform(0.2, 1, num_nodes))*1000 for _ in range(episode_length) ] )
     node_distribute = get_demands_distribution(node_demand, adj_mat)
     edge_traffic = np.floor(np.random.uniform(1000, 10000, (episode_length, num_nodes, num_nodes)) * adj_mat_without_diagnal).astype(int)  # Edge traffic

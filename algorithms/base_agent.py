@@ -49,6 +49,10 @@ class BaseAgent:
         """ Save neural network """
         pass
 
+    def load_model(self, output):
+        """ Load neural network """
+        pass
+
     def append_transition(self, obs, action, reward, done, obs_, info):
         """ Store transition """
         raise NotImplementedError("The agent does not implement the append_transition method. ")
@@ -58,5 +62,7 @@ class BaseAgent:
         Choose action according to obs.
         :param obs: observation [1, 3*self.dim_obs]
         :param is_random: (bool) whether randomly choose action
+
+        :Output: action range from [-1,1]
         """
         raise NotImplementedError("The agent does not implement the choose_action method. ")
