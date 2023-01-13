@@ -1,6 +1,7 @@
 import numpy as np
 import math
 from utils.plot import plot_result
+import os
 
 
 class EnvRunner:
@@ -80,31 +81,8 @@ class EnvRunner:
                     obs = self.env.reset()
                     break
 
-        # TODO: think we do not need warmup, we can add a if-else in buffer.sample, if the size of buffer is smaller than batch_size, then continue without training. 
-
-        # if self.algorithm_name not in self.warmup_methods:   # Other algorithms do not require warmup
-        #     print("algorithm {} do not require warmup. ".format(self.algorithm_name))
-        #     return
-
-        # print("Currently warming up")
-        # episode_num = int(self.args.buffer_size / self.episode_length)+1
-        # for i in range(episode_num):
-        #     obs = self.env.reset()
-        #     num_steps = self.episode_length if episode_num!=1 else self.args.buffer_size
-        #     for j in range(num_steps):
-        #         action = self.agent.choose_action(obs, is_random=True)
-        #         obs_, reward_list, done, info = self.env.step(action, is_warmup=False)
-        #         # action = np.array([self.env.min_bonus]*self.env.num_nodes)
-        #         # obs_, reward_list, done, info = self.env.step(action, is_warmup=True)
-        #         self.agent.append_transition(obs, action, reward_list[-1], done, obs_, info)
-        #         obs = obs_
-        #         if np.all(done):
-        #             obs = self.env.reset()
-        #         print("Episode {}/{}, iteration {}/{}".format(i+1, int(self.args.buffer_size/self.episode_length)+1, j+1, num_steps))
-        # print("Finished warming up")
-
     def run(self):
-        """Collect a training episode and perform training, saving, logging and evaluation steps"""
+        """Collect a training episode transitions and perform training, saving, logging, and evaluation steps"""
         # Collect data
         self.agent.prep_train()     # call all network.train()
 
@@ -119,20 +97,12 @@ class EnvRunner:
             # if self.args.render:
             #     self.env.render(mode="not_human")
 
-            action = self.agent.choose_action(obs)
-            if np.array([ math.isnan(val) for val in action ]).any():   # When code went wrong, the action might be nan
-                raise RuntimeError("Action is nan")
-                
+            action = self.agent.choose_action(obs)                
             obs_, reward_list, done, info = self.env.step(action)  # reward_list : [idle_prob, avg_travelling_cost, bonuses_cost, overall_cost](+,+,+,-) only the last one is minus
             print("At step", step, " agent choose action ", action)
             # print("At step {}, costs are: idle_prob {}, travelling_cost {}, bonuses_cost {}".format(step, reward_list[0], reward_list[1], reward_list[2]) )
             
-            # Append to record list 
-            reward_traj.append(reward_list)
-            action_traj[step] = action
-            nodes_actions_traj[step] = self.env.get_nodes_actions(step)
-            idle_drivers_traj[step] = obs_["idle_drivers"]
-            
+            # agent update
             self.agent.append_transition(obs, action, reward_list[-1], done, obs_, info)
             if self.last_train_T == 0 or ((self.total_env_steps-self.last_train_T) / self.train_interval_episode >= 1):
                 self.agent.learn()
@@ -142,6 +112,12 @@ class EnvRunner:
             # if (self.total_env_steps - self.last_hard_update_T) / self.hard_update_interval >= 1:
             #     self.last_hard_update_T = self.total_env_steps
             #     self.agent.hard_target_update()
+
+            # Append to record list 
+            reward_traj.append(reward_list)
+            action_traj[step] = action
+            nodes_actions_traj[step] = self.env.get_nodes_actions(step)
+            idle_drivers_traj[step] = obs_["idle_drivers"]
 
             obs = obs_
             self.total_env_steps += 1
@@ -155,6 +131,7 @@ class EnvRunner:
 
     def store_data(self):
         """This function store necessary data"""
+        os.makedirs(self.args.output_path, exist_ok=True)
         self.agent.save_model(self.args.output_path)
 
         data = self.recorder.store_data()

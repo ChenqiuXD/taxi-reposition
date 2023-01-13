@@ -38,12 +38,8 @@ class Recorder:
         self.idle_drivers_traj[self.cnt] = idle_drivers
         self.cnt += 1
 
-        if hasattr(self, "org_num_env_steps"):  # Used when loading data
-            if self.cnt > self.num_env_steps + self.org_num_env_steps:
-                raise RuntimeError("The recorder's cnt exceeds num_env_steps")
-        else:
-            if self.cnt > self.num_env_steps:
-                raise RuntimeError("The recorder's cnt exceeds num_env_steps")
+        if self.cnt > self.num_env_steps:
+            raise RuntimeError("The recorder's cnt exceeds num_env_steps")
 
     def store_data(self):
         data = {

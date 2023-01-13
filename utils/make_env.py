@@ -26,6 +26,7 @@ def make_env(args):
     node_distribute = get_demands_distribution(node_demand, adj_mat)
     edge_traffic = np.floor(np.random.uniform(1000, 10000, (episode_length, num_nodes, num_nodes)) * adj_mat_without_diagnal).astype(int)  # Edge traffic
     # upcoming_cars = np.floor(np.random.uniform(-1, 1, [episode_length, num_nodes]) * 100).astype(int)   # Upcoming cars approximately 50
+    # TODO: upcoming_cars are currently zero. 
     upcoming_cars = np.zeros([episode_length, num_nodes])
 
     env_config = {

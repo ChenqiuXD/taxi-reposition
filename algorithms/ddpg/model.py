@@ -5,54 +5,35 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-def fanin_init(size, fanin=None):
-    fanin = fanin or size[0]
-    v = 1. / np.sqrt(fanin)
-    return torch.Tensor(size).uniform_(-v, v)
-
 class Actor(nn.Module):
-    def __init__(self, nb_states, nb_actions, hidden1=400, hidden2=300, init_w=3e-3):
+    def __init__(self, state_dim, action_dim, max_action, min_action):
         super(Actor, self).__init__()
-        self.fc1 = nn.Linear(nb_states, hidden1)
-        self.fc2 = nn.Linear(hidden1, hidden2)
-        self.fc3 = nn.Linear(hidden2, nb_actions)
-        self.relu = nn.ReLU()
-        self.tanh = nn.Tanh()
-        self.init_weights(init_w)
-    
-    def init_weights(self, init_w):
-        self.fc1.weight.data = fanin_init(self.fc1.weight.data.size())
-        self.fc2.weight.data = fanin_init(self.fc2.weight.data.size())
-        self.fc3.weight.data.uniform_(-init_w, init_w)
-    
+
+        self.l1 = nn.Linear(state_dim, 400)
+        self.l2 = nn.Linear(400, 300)
+        self.l3 = nn.Linear(300, action_dim)
+
+        self.max_action = max_action
+        self.min_action = min_action
+
     def forward(self, x):
-        out = self.fc1(x)
-        out = self.relu(out)
-        out = self.fc2(out)
-        out = self.relu(out)
-        out = self.fc3(out)
-        out = self.tanh(out)
-        return out
+        x = F.relu(self.l1(x))
+        x = F.relu(self.l2(x))
+        x = torch.tanh(self.l3(x)) 
+        x = (x+1) * (self.max_action-self.min_action) / 2 + self.min_action # Normalize actions
+        return x
+
 
 class Critic(nn.Module):
-    def __init__(self, nb_states, nb_actions, hidden1=400, hidden2=300, init_w=3e-3):
+    def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
-        self.fc1 = nn.Linear(nb_states, hidden1)
-        self.fc2 = nn.Linear(hidden1+nb_actions, hidden2)
-        self.fc3 = nn.Linear(hidden2, 1)
-        self.relu = nn.ReLU()
-        self.init_weights(init_w)
-    
-    def init_weights(self, init_w):
-        self.fc1.weight.data = fanin_init(self.fc1.weight.data.size())
-        self.fc2.weight.data = fanin_init(self.fc2.weight.data.size())
-        self.fc3.weight.data.uniform_(-init_w, init_w)
-    
-    def forward(self, xs):
-        x, a = xs
-        out = self.fc1(x)
-        out = self.relu(out)
-        out = self.fc2(torch.cat([out,a],1))
-        out = self.relu(out)
-        out = self.fc3(out)
-        return out
+
+        self.l1 = nn.Linear(state_dim + action_dim, 400)
+        self.l2 = nn.Linear(400 , 300)
+        self.l3 = nn.Linear(300, 1)
+
+    def forward(self, x, u):
+        x = F.relu(self.l1(torch.cat([x, u], 1)))
+        x = F.relu(self.l2(x))
+        x = self.l3(x)
+        return x

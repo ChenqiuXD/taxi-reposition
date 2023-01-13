@@ -45,6 +45,7 @@ def main(args):
     if all_args.mode == 'train':
         all_args.output_path = get_output_folder(all_args.algorithm_name, mode=all_args.mode, continue_num=all_args.continue_num)
     elif all_args.mode == 'test':
+        # TODO: how to test our algorithm? 
         pass
 
     # create env
@@ -58,12 +59,14 @@ def main(args):
 
     # Train the agent
     # reward_result_list = []
-    if all_args.mode=="train" or all_args.mode=="continue":  # for training agents
+    if all_args.mode=="train":  # for training agents
         total_num_steps = 0
         
-        runner.warmup()
+        runner.warmup() # Warmup drivers with all minimum bonuses. 
         while total_num_steps < all_args.num_env_steps:
-            reward_list = runner.run()
+            # TODO: now we do not use tensorboard to record, please add this funciton later. 
+            # TODO: now only at end of program the agent and plot_result.py would save result, maybe save at some intervals? like 0.2, 0.4, 0.6 ... times the num_env_steps?
+            reward_list = runner.run()  # Run an episode 
             total_num_steps += 1
             print("---------------------------------------------------------------------------------------------------")
             print("At episode ", total_num_steps, " reward sum is: ", np.sum([reward_list[i][-1] for i in range(len(reward_list))]))
@@ -76,14 +79,17 @@ def main(args):
 
 
 if __name__ == "__main__":
-    # Options: null, heuristic, ddpg(TODO), direct(TODO)
-    algo = 'direct'
+    # Options: null, heuristic, direct, ddpg(TODO), metaGrad(Proposed, TODO)
+    algo = 'null'
 
-    # To continue training, please assign 'continue_num' to the run number in 'output' folder you would like to continue training. 
-    input_args = ['--algorithm_name', algo, '--seed', '15', '--mode', 'train',  
-                  '--episode_length', '6', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-3',
-                  '--warmup_steps', '1000', '--num_env_steps', '2000', 
-                  '--lr', '1e-3', '--tau', '1e-3', '--buffer_size', '64', '--batch_size', '16', '--continue_num', '3',]
+    # Recommended parameters:
+    # episode_length: 1/6;          lr_drivers: 5e-3;           warmup_steps: 3000;             num_env_steps: 10000-20000 (depends on episode_length)
+    # lr: 1e-3(direct), 1e-4 (ddpg);            tau: 5e-3;          batch_size: 16
+    # buffer_size: 128(should be small, since lower-level agents change policies);   
+    input_args = ['--algorithm_name', algo, '--seed', '35', '--mode', 'train',  
+                  '--episode_length', '1', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-3',
+                  '--warmup_steps', '3000', '--num_env_steps', '50000', 
+                  '--lr', '1e-3', '--tau', '5e-3', '--buffer_size', '128', '--batch_size', '16']
 
     # Check if there are input from system, then run the command.
     if sys.argv[1:]:

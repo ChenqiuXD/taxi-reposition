@@ -169,7 +169,7 @@ class Env:
         overall_cost = (0.4*idle_cost + 0.0*avg_travelling_cost + 0.0*bonuses_cost) # Bonuses_cost would not be included temporarily. 
         # print("costs are: {}".format([idle_cost, avg_travelling_cost, bonuses_cost]))
 
-        return np.array([-idle_cost, -avg_travelling_cost, -bonuses_cost, -overall_cost])*10  + 10
+        return np.array([-idle_cost, -avg_travelling_cost, -bonuses_cost, -overall_cost])*100  + 10
 
     def get_time_mat(self, len_mat, traffic, adj_mat):
         """ This function simulate the re-position process and return the time matrix 

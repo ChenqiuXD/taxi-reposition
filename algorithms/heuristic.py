@@ -12,8 +12,8 @@ class HeuristicPolicy(BaseAgent):
         self.min_bonus = args.min_bonus
         self.max_bonus = args.max_bonus
         self.bonus_degree = np.linspace(self.max_bonus, self.min_bonus, self.n_interval)
-        self.min_ratio = 0.5
-        self.max_ratio = 1.0
+        self.min_ratio = 0.9
+        self.max_ratio = 1.1
         self.ratio_degree = np.linspace(self.min_ratio, self.max_ratio, self.n_interval)
 
         self.num_nodes = env_config["num_nodes"]
@@ -32,7 +32,7 @@ class HeuristicPolicy(BaseAgent):
     def learn(self):
         """ Change bonuses according to recorded idle_drivers/demands ratios. Note that the range of bonus are [-1, 1]"""
         for time_step in range(self.episode_length):
-            for i in range(self.episode_length):
+            for i in range(self.num_nodes):
                 ratio = self.ratio_list[time_step][i]
 
                 if ratio > self.max_ratio:

@@ -48,12 +48,12 @@ class Game:
             prob = self.nodes[i].choose_action()  # Probability of driving to neighbour nodes
 
             # Calculate the number of drivers               
-            actions[i] = np.floor(prob*self.node_init_car[i])
+            actions[i][self.neighbour_list[i]] = np.floor(prob*self.node_init_car[i])
 
             # Assign remaining drivers
             remain_cars = self.node_init_car[i] - np.sum(actions[i])
             for _ in range(int(remain_cars)):
-                idx = np.random.choice(np.arange(self.num_nodes), p=prob)
+                idx = np.random.choice(self.neighbour_list[i], p=prob)
                 actions[i, idx] += 1
 
         actions = np.maximum(actions, 1)    # To make every element not zero. Since there are inverse of drivers' policies in DirectAgent.learn() function
