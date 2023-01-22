@@ -1,6 +1,4 @@
-# reference: https://github.com/sweetice/Deep-reinforcement-learning-with-pytorch/blob/master/Char05%20DDPG/DDPG.py 
 import os
-import pickle
 
 import numpy as np
 import torch
@@ -8,13 +6,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 
-from algorithms.ddpg.model import (Actor, Critic)
-from algorithms.ddpg.random_process import OrnsteinUhlenbeckProcess
+from algorithms.metaGrad.model import (Actor, Critic)
+from algorithms.metaGrad.random_process import OrnsteinUhlenbeckProcess
 from algorithms.base_agent import BaseAgent
 
 criterion = nn.MSELoss()
 
-class DDPG(BaseAgent):
+class metaGradAgent(BaseAgent):
     def __init__(self, args, env_config):
         super().__init__(args, env_config)
         self.args = args
@@ -106,55 +104,13 @@ class DDPG(BaseAgent):
         critic_loss.backward()
         self.critic_optim.step()
 
-        if 'grad' in locals().keys():
-            grad = torch.zeros_like(grad)
-        for state in batch_state:
-            # Try for separate update, first calculate \nabla_\theta \mu(s)
-            actor_criterion = self.actor(state)
-            grads = []
-            for k in range(self.num_nodes): # backward() could only be performed on scalar, thus we use output of each node to calculate backward()
-                self.actor_optim.zero_grad()
-                actor_criterion[k].backward(retain_graph=True)
-                grads.append(torch.cat([ p.grad.flatten().clone().detach() for p in self.actor.parameters() ], dim=0))
-            actor_grads = torch.vstack(grads)
-
-            # then calculate the \nabla_a Q(s,a)
-            self.actor_optim.zero_grad()
-            batch_actions_mu = self.actor(state)
-            batch_actions_mu.retain_grad()
-            critic_criteriion = - self.critic(state, batch_actions_mu)
-            critic_criteriion.backward()
-
-            # Calculate the comprehensive gradient
-            if 'grad' in locals().keys():
-                grad += actor_grads.T @ batch_actions_mu.grad / self.batch_size
-            else:
-                grad = actor_grads.T @ batch_actions_mu.grad / self.batch_size
-        shapes = [x.shape for x in self.actor.state_dict().values()]
-        shapes_prod = [torch.tensor(s).numpy().prod() for s in shapes]
-        grad_split = grad.split(shapes_prod)
-        gradient_calc = {}
-        cnt = 0
-        for n, p in self.actor.named_parameters():
-            gradient_calc[n] = grad_split[cnt]
-            cnt += 1
-
         # Actor loss
         actor_loss = -self.critic( batch_state, self.actor(batch_state) ).mean()
+
+        # Update actor
         self.actor_optim.zero_grad()
         actor_loss.backward()
-
-        # Store the gradient information
-        gradient_original = {}
-        for n, p in self.actor.named_parameters(): gradient_original[n] = p.grad
-        
-        # !!!  Please compare grads and gradient. 
-        print("Comparing. ")
-
         self.actor_optim.step()
-
-
-        
     
         # Soft update the target network
         for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):

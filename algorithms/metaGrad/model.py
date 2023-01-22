@@ -33,11 +33,7 @@ class Critic(nn.Module):
         self.l3 = nn.Linear(300, 1)
 
     def forward(self, x, u):
-        try:
-            x = F.relu(self.l1(torch.cat([x,u], 1)))
-        except:
-            x = F.relu(self.l1(torch.cat([x,u], 0)))
-        # x = F.relu(self.l1(torch.cat([x, u], 1)))
+        x = F.relu(self.l1(torch.cat([x, u], 1)))
         x = F.relu(self.l2(x))
         x = self.l3(x)
         return x
