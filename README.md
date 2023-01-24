@@ -22,10 +22,15 @@ For the method `null`, we display two graphs: the first is the reward trajectory
   ![Alt text](https://github.com/ChenqiuXD/taxi-reposition/blob/master/imgs/idle_drivers.png)
   <!-- <img src="https://github.com/ChenqiuXD/taxi-reposition/blob/master/imgs/idle_drivers.png", align=center width=50 /> -->
 
+FOr method `ddpg`, `metaGrad`, you can view the result of loss and maximum gradient element in tensorboard by running
+> tensorboard --logdir ./output/ALG_NAME_run1
+And follow the guidance of cmd to view the reuslt on website (for me it is the `http://localhost:6006/`)  
+
 ## Packages required
 pytorch 1.10.x   
 numpy  
-matplotlib    
+matplotlib   
+tensorboard  
 ~~torch-scatter~~  
 ~~torch-sparse~~  
 ~~torch_geometric~~   

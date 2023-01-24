@@ -7,7 +7,7 @@ def get_config():
 
     # prepare parameters
     parser.add_argument("--algorithm_name", type=str, default="null", choices=[
-                        'null', 'heuristic', 'ddpg', 'direct'])
+                        'null', 'heuristic', 'ddpg', 'direct', 'metaGrad'])
     parser.add_argument("--experiment_name", type=str, default="check")
     parser.add_argument("--seed", type=int, default=1,
                         help="Random seed for numpy/torch")

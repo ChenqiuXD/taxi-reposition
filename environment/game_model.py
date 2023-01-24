@@ -47,8 +47,9 @@ class Game:
         for i in range(actions.shape[0]):
             prob = self.nodes[i].choose_action()  # Probability of driving to neighbour nodes
 
-            # Calculate the number of drivers               
-            actions[i][self.neighbour_list[i]] = np.floor(prob*self.node_init_car[i])
+            # Calculate the number of drivers         
+            # TODO: Here I times 1/3, to improve stochasticity.       
+            actions[i][self.neighbour_list[i]] = np.floor(prob*self.node_init_car[i]/3) # times 1/3 to make drivers' acitons more stochastic
 
             # Assign remaining drivers
             remain_cars = self.node_init_car[i] - np.sum(actions[i])

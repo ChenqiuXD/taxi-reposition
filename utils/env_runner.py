@@ -50,9 +50,11 @@ class EnvRunner:
         elif self.algorithm_name == 'heuristic':
             from algorithms.heuristic import HeuristicPolicy as Algo
         elif self.algorithm_name == 'ddpg':
-            from algorithms.ddpg.ddpg import DDPG as Algo
+            from algorithms.ddpg import DDPG as Algo
         elif self.algorithm_name == 'direct':
             from algorithms.direct import DirectPolicy as Algo
+        elif self.algorithm_name == 'metaGrad':
+            from algorithms.metaGrad import metaAgent as Algo
         else:
             raise NotImplementedError("The method " + self.algorithm_name + " is not implemented. Please check env_runner.py line 40 to see whether your method is added to the setup_agent function ")
 

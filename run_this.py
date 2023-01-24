@@ -11,7 +11,8 @@ from utils.get_output_folder import get_output_folder
 
 def parse_args(args, parser):
     """ Add arguments to the 'args' variable """
-    parser.add_argument('--epsilon', type=float, default=0.9, help="Epsilon greedy")
+    parser.add_argument('--epsilon', type=float, default=0.1, help="Epsilon greedy")
+    parser.add_argument('--decre_epsilon', type=float, default=1000, help="NUmber of episodes that the epsilon would decrese to minimum")
     parser.add_argument('--tau', type=float, default=1e-3, help="Learning rate for the soft update")
     parser.add_argument('--gamma', type=float, default=0.99, help="Discount factor")
     parser.add_argument('--mode', type=str, default="train", help='train, test')
@@ -64,7 +65,6 @@ def main(args):
         
         runner.warmup() # Warmup drivers with all minimum bonuses. 
         while total_num_steps < all_args.num_env_steps:
-            # TODO: now we do not use tensorboard to record, please add this funciton later. 
             reward_list = runner.run()  # Run an episode 
             total_num_steps += 1
             print("---------------------------------------------------------------------------------------------------")
@@ -72,7 +72,7 @@ def main(args):
             print("---------------------------------------------------------------------------------------------------\n\n\n")
 
             # Save data amid process
-            if total_num_steps % int(all_args.num_env_steps / 5)==0:
+            if (total_num_steps+1) % int(all_args.num_env_steps / 3)==0:
                 runner.store_data()
         runner.store_data()
     elif all_args.mode=="test":
@@ -83,16 +83,16 @@ def main(args):
 
 if __name__ == "__main__":
     # Options: null, heuristic, direct, ddpg(TODO), metaGrad(Proposed, TODO)
-    algo = 'ddpg'
+    algo = 'metaGrad'
 
     # Recommended parameters:
-    # episode_length: 1/6;          lr_drivers: 5e-3;           warmup_steps: 3000;             num_env_steps: 10000-20000 (depends on episode_length)
+    # episode_length: 1 / 6 / 12;          lr_drivers: 5e-3;           warmup_steps: 3000;             num_env_steps: 10000-20000 (depends on episode_length)
     # lr: 1e-3(direct), 1e-4 (ddpg);            tau: 5e-3;          batch_size: 16
     # buffer_size: 128(should be small, since lower-level agents change policies);   
     input_args = ['--algorithm_name', algo, '--seed', '35', '--mode', 'train',  
                   '--episode_length', '1', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-3',
-                  '--warmup_steps', '3000', '--num_env_steps', '50000', 
-                  '--lr', '1e-3', '--tau', '5e-3', '--buffer_size', '128', '--batch_size', '10']
+                  '--warmup_steps', '10', '--num_env_steps', '300', 
+                  '--lr', '5e-4', '--tau', '5e-3', '--buffer_size', '16', '--batch_size', '4']
 
     # Check if there are input from system, then run the command.
     if sys.argv[1:]:

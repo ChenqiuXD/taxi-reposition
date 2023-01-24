@@ -1,4 +1,6 @@
+# reference: https://github.com/sweetice/Deep-reinforcement-learning-with-pytorch/blob/master/Char05%20DDPG/DDPG.py 
 import os
+import pickle
 
 import numpy as np
 import torch
@@ -6,13 +8,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 
-from algorithms.metaGrad.model import (Actor, Critic)
-from algorithms.metaGrad.random_process import OrnsteinUhlenbeckProcess
 from algorithms.base_agent import BaseAgent
 
 criterion = nn.MSELoss()
 
-class metaGradAgent(BaseAgent):
+class DDPG(BaseAgent):
     def __init__(self, args, env_config):
         super().__init__(args, env_config)
         self.args = args
@@ -42,18 +42,17 @@ class metaGradAgent(BaseAgent):
         self.batch_size = args.batch_size
         self.buffer_ptr = 0
         self.buffer = np.zeros([self.buffer_size, 2*self.dim_states+self.dim_actions+2])  # each transition is [s,a,r,s',d] where d represents done
-        self.random_process = OrnsteinUhlenbeckProcess(size=self.dim_actions, theta=0.15, mu=0., sigma=0.01)
         self.buffer_high = 0    # Used to mark the appended buffer (avoid training with un-appended sample indexes)
 
         # Hyper-parameters
         self.tau = args.tau
         self.discount = args.gamma
+        self.train_steps = 0
 
         # Randomness parameters
         self.epsilon_max = 0.20
         self.epsilon_min = 0.10
-        # TODO: currently the annealing parameters are fixed, could this be integrated into run_this.py? Or is it necessary?
-        self.depsilon = (self.epsilon_max - self.epsilon_min) / 10000.
+        self.depsilon = (self.epsilon_max - self.epsilon_min) / args.decre_epsilon
         self.epsilon = self.epsilon_max
         self.is_training = True
 
@@ -63,7 +62,6 @@ class metaGradAgent(BaseAgent):
         else:
             state = torch.FloatTensor(self.s2obs(s)).to(self.device)
             actions = self.actor(state).cpu().data.numpy()
-            # actions += self.is_training*max(self.epsilon, 0)*self.random_process.sample()
             actions = ( actions + np.random.normal(0, self.epsilon, self.dim_actions) ).clip(self.min_bonus, self.max_bonus)
             self.epsilon = np.maximum(self.epsilon-self.depsilon, self.epsilon_min) 
         
@@ -92,6 +90,7 @@ class metaGradAgent(BaseAgent):
             print("Transition number is lesser than batch_size, continue training. ")
             return
 
+        # Target q values
         target_Q = self.critic_target( batch_next_state, self.actor_target(batch_next_state) )
         target_Q = batch_rewards + (batch_done * self.discount * target_Q).detach()
 
@@ -106,11 +105,18 @@ class metaGradAgent(BaseAgent):
 
         # Actor loss
         actor_loss = -self.critic( batch_state, self.actor(batch_state) ).mean()
-
-        # Update actor
         self.actor_optim.zero_grad()
         actor_loss.backward()
         self.actor_optim.step()
+
+        # Record the loss trajectory
+        critic_grad = np.concatenate([x.grad.cpu().numpy().reshape([-1]) for x in self.critic.parameters()])
+        self.writer.add_scalar("critic_grad_max", np.max(critic_grad), self.train_steps)
+        actor_grad = np.concatenate([x.grad.cpu().numpy().reshape([-1]) for x in self.actor.parameters()])
+        self.writer.add_scalar("actor_grad_max", np.max(actor_grad), self.train_steps)
+        self.writer.add_scalar("critic_loss", critic_loss.item(), self.train_steps)
+        self.writer.add_scalar("actor_loss", actor_loss.item(), self.train_steps)
+        self.train_steps += 1
     
         # Soft update the target network
         for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
@@ -163,3 +169,41 @@ class metaGradAgent(BaseAgent):
         torch.manual_seed(s)
         if self.use_cuda:
             torch.cuda.manual_seed(s)
+
+
+class Actor(nn.Module):
+    def __init__(self, state_dim, action_dim, max_action, min_action):
+        super(Actor, self).__init__()
+
+        self.l1 = nn.Linear(state_dim, 400)
+        self.l2 = nn.Linear(400, 300)
+        self.l3 = nn.Linear(300, action_dim)
+
+        self.max_action = max_action
+        self.min_action = min_action
+
+    def forward(self, x):
+        x = F.relu(self.l1(x))
+        x = F.relu(self.l2(x))
+        x = torch.tanh(self.l3(x)) 
+        x = (x+1) * (self.max_action-self.min_action) / 2 + self.min_action # Normalize actions
+        return x
+
+
+class Critic(nn.Module):
+    def __init__(self, state_dim, action_dim):
+        super(Critic, self).__init__()
+
+        self.l1 = nn.Linear(state_dim + action_dim, 400)
+        self.l2 = nn.Linear(400 , 300)
+        self.l3 = nn.Linear(300, 1)
+
+    def forward(self, x, u):
+        try:
+            x = F.relu(self.l1(torch.cat([x,u], 1)))
+        except:
+            x = F.relu(self.l1(torch.cat([x,u], 0)))
+        # x = F.relu(self.l1(torch.cat([x, u], 1)))
+        x = F.relu(self.l2(x))
+        x = self.l3(x)
+        return x

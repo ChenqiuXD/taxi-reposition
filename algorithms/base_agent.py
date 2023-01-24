@@ -1,3 +1,5 @@
+from torch.utils.tensorboard import SummaryWriter
+import os
 
 class BaseAgent:
     def __init__(self, args, env_config):
@@ -24,6 +26,9 @@ class BaseAgent:
         self.buffer_size = args.buffer_size
         self.buffer = []
         self.buffer_ptr = 0
+
+        # Tensorboard writer
+        self.writer = SummaryWriter(log_dir=args.output_path)
 
     def learn(self):
         """ Agent learns to adapt the bonuses policy """

@@ -35,7 +35,9 @@ def plot_result(all_args, result):
 
     # Get some arg parameters
     episode_length = result["init_setting"]["upcoming_cars"].shape[0]
-    result_length = result["reward_traj"].shape[0]
+    # Obtain current episode numbers 
+    reward_traj = result['reward_traj']
+    result_length = np.where( reward_traj[:,:,-1]==reward_traj[-1,:,-1] )[0][0]
 
     num_nodes = result["init_setting"]["upcoming_cars"].shape[1]
     edge_index = get_edge_index(result['init_setting']['edge_traffic'][0])
@@ -131,5 +133,5 @@ def plot_result(all_args, result):
     print("done")
 
 if __name__ == "__main__":
-    # TODO: Please write this function to plot steps of assigned steps. 
+    # TODO: Please write this function to plot steps of assigned interval
     pass
