@@ -56,7 +56,7 @@ def get_demands_distribution(node_demand, adj_mat):
     n_node = adj_mat.shape[0]
     distribution = np.random.uniform(1,3,[episode_length, n_node, n_node]) * adj_mat + \
                    10000*(np.vstack([adj_mat[np.newaxis, :, :]-1]*episode_length))    # unreachable entries' values are -10000
-    dist_mat = np.vstack( [ np.vstack(softmax(distribution[i][j]) for j in range(n_node)) ] for i in range(episode_length) )
+    dist_mat = np.vstack( [ np.vstack([ softmax(distribution[i][j]) for j in range(n_node) ])  for i in range(episode_length) ])
     return dist_mat
 
 

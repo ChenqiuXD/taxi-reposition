@@ -104,7 +104,7 @@ class EnvRunner:
 
             action = self.agent.choose_action(obs)                
             obs_, reward_list, done, info = self.env.step(action)  # reward_list : [idle_prob, avg_travelling_cost, bonuses_cost, overall_cost](+,+,+,-) only the last one is minus
-            print("At step", step, " agent choose action ", action)
+            print("At step", step, " agent choose action ", np.round(action, decimals=3))
             # self.env.decrease_lr(step)  # Decrease the learning rate of drivers' agents
             # print("At step {}, costs are: idle_prob {}, travelling_cost {}, bonuses_cost {}".format(step, reward_list[0], reward_list[1], reward_list[2]) )
             

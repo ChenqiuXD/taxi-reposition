@@ -27,6 +27,7 @@ def parse_args(args, parser):
     parser.add_argument('--lr_drivers', type=float, default=1e-3, help="learning rate for drivers")
     parser.add_argument('--decrease_lr_drivers', type=float, default=1e-6, help="Decrement of learning rate of drivers")
     parser.add_argument('--min_lr_drivers', type=float, default=1e-5, help="minimum learning rate of drivers")
+
     parser.add_argument('--min_bonus', type=float, default=0, help="The minimum bonus")
     parser.add_argument('--max_bonus', type=float, default=4, help='The maximum bonus')
 
@@ -88,18 +89,19 @@ def main(args):
 
 
 if __name__ == "__main__":
-    # Options: null, heuristic, direct, ddpg(TODO), metaGrad(Proposed, TODO), ddpg_gnn(TODO)
-    algo = 'ddpg'
+    # Options: null, heuristic, direct, ddpg, metaGrad(Proposed, TODO), ddpg_gnn(TODO)
+    algo = 'metaGrad'
 
     # Recommended parameters:
     # episode_length: 1 / 6 / 12;          lr_drivers: 5e-3;           warmup_steps: 3000;             num_env_steps: 10000-20000 (depends on episode_length)
     # lr: 5e-3(direct), 1e-4 (ddpg);            tau: 5e-3;          batch_size: 16
     # buffer_size: 128(should be small, since lower-level agents change policies);   
-    input_args = ['--algorithm_name', algo, '--seed', '35', '--mode', 'train', 
-                  '--is_two_loop',   
-                  '--episode_length', '10', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-2',
-                  '--warmup_steps', '10', '--num_env_steps', '100', 
-                  '--lr', '1e-4', '--tau', '5e-3', '--buffer_size', '128', '--batch_size', '16']
+    input_args = ['--algorithm_name', algo, '--seed', '35', '--mode', 'train',   
+                #   '--is_two_loop',  
+                  '--episode_length', '10', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-1',   
+                  '--lr', '1e-4', '--tau', '5e-3', '--buffer_size', '128', '--batch_size', '16',   
+                  '--warmup_steps', '3000', '--num_env_steps', '8000',  
+                  '--min_epsilon', '0', '--max_epsilon', '0.2', '--decre_epsilon_episodes', '4000'] 
                   # "is_two_loop" with this tag, the environment would run in two loops, outer loop would wait until inner loop reach equilibrium. 
 
     # Check if there are input from system, then run the command.
