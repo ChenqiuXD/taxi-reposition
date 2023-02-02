@@ -47,12 +47,11 @@ class DDPG(BaseAgent):
         # Hyper-parameters
         self.tau = args.tau
         self.discount = args.gamma
-        self.train_steps = 0
 
         # Randomness parameters
-        self.epsilon_max = 0.20
-        self.epsilon_min = 0.10
-        self.depsilon = (self.epsilon_max - self.epsilon_min) / args.decre_epsilon
+        self.epsilon_max = args.max_epsilon
+        self.epsilon_min = args.min_epsilon
+        self.depsilon = (self.epsilon_max - self.epsilon_min) / args.decre_epsilon_episodes
         self.epsilon = self.epsilon_max
         self.is_training = True
 
@@ -61,7 +60,7 @@ class DDPG(BaseAgent):
             actions = np.random.uniform(self.min_bonus, self.max_bonus, self.dim_actions)
         else:
             state = torch.FloatTensor(self.s2obs(s)).to(self.device)
-            actions = self.actor(state).cpu().data.numpy()
+            actions = self.actor(state).cpu().detach().numpy()
             actions = ( actions + np.random.normal(0, self.epsilon, self.dim_actions) ).clip(self.min_bonus, self.max_bonus)
             self.epsilon = np.maximum(self.epsilon-self.depsilon, self.epsilon_min) 
         
@@ -83,7 +82,7 @@ class DDPG(BaseAgent):
             batch_memory = self.buffer[sample_index, :]
             batch_state = torch.FloatTensor(batch_memory[:, :self.dim_states]).to(self.device)
             batch_actions = torch.FloatTensor(batch_memory[:, self.dim_states:self.dim_states+self.dim_actions]).to(self.device)
-            batch_rewards = torch.FloatTensor(batch_memory[:, self.dim_states+self.dim_actions+1:self.dim_states+self.dim_actions+2]).to(self.device)
+            batch_rewards = torch.FloatTensor(batch_memory[:, self.dim_states+self.dim_actions:self.dim_states+self.dim_actions+1]).to(self.device)
             batch_next_state = torch.FloatTensor(batch_memory[:, -self.dim_states-1:-1]).to(self.device)
             batch_done = torch.FloatTensor(1 - batch_memory[:, -1]).to(self.device).view([-1,1])
         else:   # Continue append transition, stop learn()

@@ -17,7 +17,7 @@ class Node:
 
         num_neighbour = len(self.neighbour_list)
         self.action_prob = 1/num_neighbour * np.ones(num_neighbour)
-        self.action_prob_traj = np.zeros([self.max_epoch, num_neighbour])
+        # self.action_prob_traj = np.zeros([self.max_epoch, num_neighbour])
 
         self.cnt = 0
 
@@ -31,13 +31,14 @@ class Node:
         INPUT:          payoff: ([num_neighbour_node, 1] ndarray) payoff experienced of neighbour nodes
         """
         # Record the trajectory
-        if self.is_warmed_up:
-            self.action_prob_traj[self.cnt] = self.action_prob
-        elif self.cnt>=self.warmup_epoch:   # Renew the counter to eliminate trajectory during warm up. We require the cnt to know whether warmup has finished. 
-            self.is_warmed_up = True
-            self.cnt=0
+        # if self.is_warmed_up:
+        #     self.action_prob_traj[self.cnt] = self.action_prob
+        # elif self.cnt>=self.warmup_epoch:   # Renew the counter to eliminate trajectory during warm up. We require the cnt to know whether warmup has finished. 
+        #     self.is_warmed_up = True
+        #     self.cnt=0
 
         self.cnt += 1
         
+        # Maximise the payoff 
         normalizetion_factor = np.sum(  self.action_prob * np.exp(self.lr*payoff)  )
         self.action_prob = self.action_prob * np.exp(self.lr*payoff) / normalizetion_factor

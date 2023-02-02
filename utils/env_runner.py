@@ -2,6 +2,7 @@ import numpy as np
 import math
 from utils.plot import plot_result
 import os
+from tqdm import tqdm
 
 
 class EnvRunner:
@@ -55,6 +56,8 @@ class EnvRunner:
             from algorithms.direct import DirectPolicy as Algo
         elif self.algorithm_name == 'metaGrad':
             from algorithms.metaGrad import metaAgent as Algo
+        elif self.algorithm_name == 'ddpg_gnn':
+            from algorithms.ddpg_gnn.ddpgGNN import ddpg_GNN_Agent as Algo
         else:
             raise NotImplementedError("The method " + self.algorithm_name + " is not implemented. Please check env_runner.py line 40 to see whether your method is added to the setup_agent function ")
 
@@ -73,11 +76,11 @@ class EnvRunner:
         """Fill up agents' replay buffer"""
         # Warmup the environment first
         print("Warming up the drivers")
-        for _ in range(self.args.warmup_steps):
+        for _ in tqdm( range( 1, self.args.warmup_steps ) ):
             obs = self.env.reset()
             while True:
                 action = np.zeros(self.num_nodes)
-                obs_, reward_list, done, info = self.env.step(action, is_warmup=False)  # Assign false to make drivers update policies. 
+                obs_, reward_list, done, info = self.env.step(action)  # Assign false to make drivers update policies. 
                 obs = obs_
                 if done:
                     obs = self.env.reset()
@@ -102,6 +105,7 @@ class EnvRunner:
             action = self.agent.choose_action(obs)                
             obs_, reward_list, done, info = self.env.step(action)  # reward_list : [idle_prob, avg_travelling_cost, bonuses_cost, overall_cost](+,+,+,-) only the last one is minus
             print("At step", step, " agent choose action ", action)
+            # self.env.decrease_lr(step)  # Decrease the learning rate of drivers' agents
             # print("At step {}, costs are: idle_prob {}, travelling_cost {}, bonuses_cost {}".format(step, reward_list[0], reward_list[1], reward_list[2]) )
             
             # agent update

@@ -28,6 +28,7 @@ class BaseAgent:
         self.buffer_ptr = 0
 
         # Tensorboard writer
+        self.train_steps = 0
         self.writer = SummaryWriter(log_dir=args.output_path)
 
     def learn(self):

@@ -51,9 +51,9 @@ class metaAgent(BaseAgent):
         self.discount = args.gamma
 
         # Randomness parameters
-        self.epsilon_max = 0.20
-        self.epsilon_min = 0.10
-        self.depsilon = (self.epsilon_max - self.epsilon_min) / args.decre_epsilon
+        self.epsilon_max = args.max_epsilon
+        self.epsilon_min = args.min_epsilon
+        self.depsilon = (self.epsilon_max - self.epsilon_min) / args.decre_epsilon_episodes
         self.epsilon = self.epsilon_max
         self.is_training = True
         self.train_steps = 0
@@ -109,7 +109,7 @@ class metaAgent(BaseAgent):
             batch_memory = self.buffer[sample_index, :]
             batch_state = torch.FloatTensor(batch_memory[:, :self.dim_states]).to(self.device)
             # batch_actions = torch.FloatTensor(batch_memory[:, self.dim_states:self.dim_states+self.dim_actions]).to(self.device)
-            batch_rewards = torch.FloatTensor(batch_memory[:, self.dim_states+self.dim_actions+1:self.dim_states+self.dim_actions+2]).to(self.device)
+            batch_rewards = torch.FloatTensor(batch_memory[:, self.dim_states+self.dim_actions:self.dim_states+self.dim_actions+1]).to(self.device)
             batch_next_state = torch.FloatTensor(batch_memory[:, -self.dim_states-1:-1]).to(self.device)
             batch_done_np = 1 - batch_memory[:, -1]
             batch_done = torch.FloatTensor(batch_done_np).to(self.device).view([-1,1])

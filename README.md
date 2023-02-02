@@ -31,9 +31,8 @@ pytorch 1.10.x
 numpy  
 matplotlib   
 tensorboard  
-~~torch-scatter~~  
-~~torch-sparse~~  
-~~torch_geometric~~   
+tqdm  
+torch_geometric  
 ~~sumo-related (sumolib, traci, etc)~~
 
 ## Reference

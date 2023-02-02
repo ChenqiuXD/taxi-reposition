@@ -1,5 +1,4 @@
 import numpy as np
-import argparse
 from environment.utils import get_adj_mat, vec2mat
 from environment.game_model import Game 
 
@@ -27,7 +26,7 @@ class Env:
 
         # flag of whether reset
         self.is_reset = False
-
+        self.is_two_loop = args.is_two_loop
         self.output_path = args.output_path
 
         # Drivers' Game, used to simulate the payoff
@@ -65,7 +64,7 @@ class Env:
 
         return init_state
 
-    def step(self, actions, is_warmup=False):
+    def step(self, bonuses):
         """ Step to next state.
         INPUT:      actions: (num_nodes*1 np.ndarray) is the bonuses assigned to each node
         OUTPUT:     next_state: next state
@@ -78,16 +77,22 @@ class Env:
         # agents choose actions
         time_step = self.cur_state["time_step"]
         self.games[time_step].update_state(self.cur_state)
-        # nodes_actions = (self.games[time_step].choose_actions()).astype(int)
-        nodes_actions = self.games[time_step].choose_actions()
 
-        # Simulate and observe payoff
+        # Update agents policy
         time_mat = self.get_time_mat(self.cur_state["len_mat"], self.cur_state["edge_traffic"], self.adj_mat)
-
-        # TODO: if we delete the warmup of agent, this 'if' is unnecessary. 
-        if not is_warmup:   # While warming up, keep the policies of nodes unchanged. 
-            payoff = self.games[time_step].observe_payoff(actions, time_mat, nodes_actions)
+        if self.is_two_loop:   # With one loop, 
+            nodes_actions = self.games[time_step].choose_actions()  # In choose actions, the stochastic is increased by settings actions /3 
+            payoff = self.games[time_step].observe_payoff(bonuses, time_mat, nodes_actions)
             self.games[time_step].update_policy(payoff)
+        else:
+            for t in range(50): # TODO: 2 timescale, the inner loop require the agents reach the nash equilibrium. 
+                nodes_actions = self.games[time_step].choose_actions()  # In choose actions, the stochastic is increased by settings actions /3 
+                payoff = self.games[time_step].observe_payoff(bonuses, time_mat, nodes_actions)
+                self.games[time_step].update_policy(payoff)
+
+        # NOTE that agents choose actions twice, so that the bonuses would immediately impact on the agents' policies. 
+        # Choose actions according to the newly updated agents policies. 
+        nodes_actions = self.games[time_step].choose_actions()  # In choose actions, the stochastic is increased by settings actions /3 
 
         # Prepare information of next state
         if self.cur_state["time_step"]+1 >= self.episode_length:
@@ -98,7 +103,7 @@ class Env:
             done = False
 
         # Calculate reward for drivers agents: returns a list [idle_cost, travelling_time_cost, bonuses_cost]
-        reward = self.reward_func(time_mat, actions, nodes_actions) # actions are the bonuses, nodes_actions are the distribution of idle drivers
+        reward = self.reward_func(time_mat, bonuses, nodes_actions) # actions are the bonuses, nodes_actions are the distribution of idle drivers
         # print("Cost is: ", cost)
 
         last_state_demand = self.env_config["node_demand"][time_step-1]
@@ -139,7 +144,7 @@ class Env:
                     nodes_actions: ([num_nodes, num_nodes], ndarray) the drivers' re-position matrix
         OUTPUT:     reward: (scalar) the comprehensive reward
          """
-        norm_factor = {"idle_cost": 0.4, "travelling_cost": 1, "bonus_cost": 1}
+        norm_factor = {"idle_cost": 1, "travelling_cost": 0, "bonus_cost": 0}
 
         # Calculate idle/demand cost using mse loss
         # node_cars = np.sum(nodes_actions, axis=0) + self.cur_state["upcoming_cars"]   # Tempoorarily eliminate the impact of upcoming cars. 
@@ -166,10 +171,16 @@ class Env:
         bonuses_cost *= norm_factor['bonus_cost']
 
         # Calculate comprehensive cost
-        overall_cost = (0.4*idle_cost + 0.0*avg_travelling_cost + 0.0*bonuses_cost) # Bonuses_cost would not be included temporarily. 
+        overall_cost = (norm_factor['idle_cost']*idle_cost +
+                        norm_factor['travelling_cost']*avg_travelling_cost + 
+                        norm_factor['bonus_cost'] *bonuses_cost) # Bonuses_cost would not be included temporarily. 
         # print("costs are: {}".format([idle_cost, avg_travelling_cost, bonuses_cost]))
 
-        return np.array([-idle_cost, -avg_travelling_cost, -bonuses_cost, -overall_cost])*100  + 10
+        return np.array([-idle_cost, -avg_travelling_cost, -bonuses_cost, -overall_cost])*100
+
+    def decrease_lr(self, time_steps):
+        """ Lower level agents decrease the learning rate.  """
+        self.games[time_steps].decrease_lr()        
 
     def get_time_mat(self, len_mat, traffic, adj_mat):
         """ This function simulate the re-position process and return the time matrix 

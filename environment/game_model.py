@@ -18,11 +18,15 @@ class Game:
         self.neighbour_list = [np.where(self.adj_mat[i]==1)[0] for i in range(self.num_nodes)]
 
         # hyper-parameters
-        self.lr_drivers = args.lr_drivers
         self.max_epoch = args.num_env_steps
         # self.is_display = args.render
         self.max_bonus = args.max_bonus
         self.min_bonus = args.min_bonus
+
+        # learning_rate config
+        self.lr_drivers = args.lr_drivers
+        self.min_lr_drivers = args.min_lr_drivers
+        self.decrease_lr_drivers = args.decrease_lr_drivers
 
         # Initialize env
         self.nodes = [Node(i, setting, self.lr_drivers, max_epoch=self.max_epoch, warmup_epoch=args.warmup_steps) for i in range(self.num_nodes)]
@@ -48,8 +52,8 @@ class Game:
             prob = self.nodes[i].choose_action()  # Probability of driving to neighbour nodes
 
             # Calculate the number of drivers         
-            # TODO: Here I times 1/3, to improve stochasticity.       
-            actions[i][self.neighbour_list[i]] = np.floor(prob*self.node_init_car[i]/3) # times 1/3 to make drivers' acitons more stochastic
+            # TODO: Here I times 0.8, to improve stochasticity. (CURRENTLY no stochastic)
+            actions[i][self.neighbour_list[i]] = np.floor(prob*self.node_init_car[i])
 
             # Assign remaining drivers
             remain_cars = self.node_init_car[i] - np.sum(actions[i])
@@ -94,8 +98,14 @@ class Game:
             entropy_cost[i][self.neighbour_list[i]] = np.log(drivers_policies[i][self.neighbour_list[i]])
 
         # Calculate the overall payoff (use adj_mat to eliminate the payoff of unrealizable edges)
-        payoff = -factor["idle"] * idle_cost -factor['time'] * time_cost + factor["bonuses"] * bonuses - factor['entropy'] * entropy_cost
+        payoff = - factor["idle"] * idle_cost - factor['time'] * time_cost\
+                 + factor["bonuses"] * bonuses - factor['entropy'] * entropy_cost
         return payoff
+
+    def decrease_lr(self):
+        """ Decrease the lower-level agents' learning rate """
+        for node in self.nodes:
+            node.lr = np.maximum( node.lr-self.decrease_lr_drivers, self.min_lr_drivers )
 
     def update_policy(self, payoff):
         """Drivers update their policies

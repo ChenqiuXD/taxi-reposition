@@ -12,15 +12,21 @@ from utils.get_output_folder import get_output_folder
 def parse_args(args, parser):
     """ Add arguments to the 'args' variable """
     parser.add_argument('--epsilon', type=float, default=0.1, help="Epsilon greedy")
-    parser.add_argument('--decre_epsilon', type=float, default=1000, help="NUmber of episodes that the epsilon would decrese to minimum")
+    parser.add_argument('--max_epsilon', type=float, default=0.2, help="max epsilon")
+    parser.add_argument('--min_epsilon', type=float, default=0.05, help="min epsilon")
+    parser.add_argument('--decre_epsilon_episodes', type=float, default=10000, help="Number of episodes that the epsilon would decrese to minimum")
     parser.add_argument('--tau', type=float, default=1e-3, help="Learning rate for the soft update")
     parser.add_argument('--gamma', type=float, default=0.99, help="Discount factor")
-    parser.add_argument('--mode', type=str, default="train", help='train, test')
-    parser.add_argument('--continue_num', type=int, default=0, help='if mode is continue, then load network parameters from this run_(continue_num)')
     parser.add_argument('--warmup_steps', type=int, default=100, help='drivers warmup episodes')
     parser.add_argument('--render', action="store_false", default=True, help='Render or not')
 
+    parser.add_argument('--mode', type=str, default="train", help='train, test')
+    # when '--is_one_loop', this arg is True, else it's False
+    parser.add_argument('--is_two_loop', action="store_false", help='whether the environment simulates in two loops or one loops. ')
+
     parser.add_argument('--lr_drivers', type=float, default=1e-3, help="learning rate for drivers")
+    parser.add_argument('--decrease_lr_drivers', type=float, default=1e-6, help="Decrement of learning rate of drivers")
+    parser.add_argument('--min_lr_drivers', type=float, default=1e-5, help="minimum learning rate of drivers")
     parser.add_argument('--min_bonus', type=float, default=0, help="The minimum bonus")
     parser.add_argument('--max_bonus', type=float, default=4, help='The maximum bonus')
 
@@ -44,7 +50,7 @@ def main(args):
 
     # Get save path
     if all_args.mode == 'train':
-        all_args.output_path = get_output_folder(all_args.algorithm_name, mode=all_args.mode, continue_num=all_args.continue_num)
+        all_args.output_path = get_output_folder(all_args.algorithm_name, mode=all_args.mode)
     elif all_args.mode == 'test':
         # TODO: how to test our algorithm? 
         pass
@@ -72,7 +78,7 @@ def main(args):
             print("---------------------------------------------------------------------------------------------------\n\n\n")
 
             # Save data amid process
-            if (total_num_steps+1) % int(all_args.num_env_steps / 3)==0:
+            if (total_num_steps+1) % int(all_args.num_env_steps / 3)==0 and np.abs( total_num_steps-all_args.num_env_steps )>=5:    # Prevent save twice in last few episodes. 
                 runner.store_data()
         runner.store_data()
     elif all_args.mode=="test":
@@ -82,17 +88,19 @@ def main(args):
 
 
 if __name__ == "__main__":
-    # Options: null, heuristic, direct, ddpg(TODO), metaGrad(Proposed, TODO)
-    algo = 'metaGrad'
+    # Options: null, heuristic, direct, ddpg(TODO), metaGrad(Proposed, TODO), ddpg_gnn(TODO)
+    algo = 'ddpg'
 
     # Recommended parameters:
     # episode_length: 1 / 6 / 12;          lr_drivers: 5e-3;           warmup_steps: 3000;             num_env_steps: 10000-20000 (depends on episode_length)
-    # lr: 1e-3(direct), 1e-4 (ddpg);            tau: 5e-3;          batch_size: 16
+    # lr: 5e-3(direct), 1e-4 (ddpg);            tau: 5e-3;          batch_size: 16
     # buffer_size: 128(should be small, since lower-level agents change policies);   
-    input_args = ['--algorithm_name', algo, '--seed', '35', '--mode', 'train',  
-                  '--episode_length', '1', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-3',
-                  '--warmup_steps', '10', '--num_env_steps', '300', 
-                  '--lr', '5e-4', '--tau', '5e-3', '--buffer_size', '16', '--batch_size', '4']
+    input_args = ['--algorithm_name', algo, '--seed', '35', '--mode', 'train', 
+                  '--is_two_loop',   
+                  '--episode_length', '10', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-2',
+                  '--warmup_steps', '10', '--num_env_steps', '100', 
+                  '--lr', '1e-4', '--tau', '5e-3', '--buffer_size', '128', '--batch_size', '16']
+                  # "is_two_loop" with this tag, the environment would run in two loops, outer loop would wait until inner loop reach equilibrium. 
 
     # Check if there are input from system, then run the command.
     if sys.argv[1:]:
