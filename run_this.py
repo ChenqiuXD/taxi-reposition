@@ -21,8 +21,7 @@ def parse_args(args, parser):
     parser.add_argument('--render', action="store_false", default=True, help='Render or not')
 
     parser.add_argument('--mode', type=str, default="train", help='train, test')
-    # when '--is_one_loop', this arg is True, else it's False
-    parser.add_argument('--is_two_loop', action="store_false", help='whether the environment simulates in two loops or one loops. ')
+    parser.add_argument('--is_two_loop', action="store_true", help='whether the environment simulates in two loops or one loops. ')
 
     parser.add_argument('--lr_drivers', type=float, default=1e-3, help="learning rate for drivers")
     parser.add_argument('--decrease_lr_drivers', type=float, default=1e-6, help="Decrement of learning rate of drivers")
@@ -79,7 +78,8 @@ def main(args):
             print("---------------------------------------------------------------------------------------------------\n\n\n")
 
             # Save data amid process
-            if (total_num_steps+1) % int(all_args.num_env_steps / 3)==0 and np.abs( total_num_steps-all_args.num_env_steps )>=5:    # Prevent save twice in last few episodes. 
+            save_times = 5
+            if (total_num_steps+1) % int(all_args.num_env_steps / save_times)==0 and np.abs( total_num_steps-all_args.num_env_steps )>save_times:    # Prevent save twice in last few episodes. 
                 runner.store_data()
         runner.store_data()
     elif all_args.mode=="test":
@@ -100,8 +100,8 @@ if __name__ == "__main__":
                 #   '--is_two_loop',  
                   '--episode_length', '10', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-1',   
                   '--lr', '1e-4', '--tau', '5e-3', '--buffer_size', '128', '--batch_size', '16',   
-                  '--warmup_steps', '3000', '--num_env_steps', '8000',  
-                  '--min_epsilon', '0', '--max_epsilon', '0.2', '--decre_epsilon_episodes', '4000'] 
+                  '--warmup_steps', '100', '--num_env_steps', '4000',  
+                  '--min_epsilon', '0', '--max_epsilon', '0.2', '--decre_epsilon_episodes', '4000']
                   # "is_two_loop" with this tag, the environment would run in two loops, outer loop would wait until inner loop reach equilibrium. 
 
     # Check if there are input from system, then run the command.

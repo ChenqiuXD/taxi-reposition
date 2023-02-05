@@ -13,8 +13,6 @@ class EnvRunner:
         self.device = args.device
         self.recorder = recorder
 
-        self.warmup_methods = ['ddpg', 'dqn']
-
         # set tunable hyper-parameters
         self.algorithm_name = self.args.algorithm_name
         self.num_env_steps = self.args.num_env_steps
@@ -63,7 +61,7 @@ class EnvRunner:
 
         env_config = {
             "num_nodes": self.env.num_nodes,
-            "dim_action": self.env.num_nodes,       # 5, since there are 5 nodes
+            "dim_action": self.env.num_nodes,       # bonuses, thus dimension of action should be num of nodes. 
             "dim_observation": self.env.obs_spaces,  # Full observation (equals num_nodes*dim_node_obs+num_edges*dim_edge_obs)
             "dim_node_obs": self.env.dim_node_obs,  # node's observation 3, [idle drivers, upcoming cars, demands]
             "dim_edge_obs": self.env.dim_edge_obs,  # edge's observation 2, [edge_traffic, len_mat]
@@ -73,13 +71,12 @@ class EnvRunner:
         return Algo(self.args, env_config)
 
     def warmup(self):
-        """Fill up agents' replay buffer"""
-        # Warmup the environment first
+        """ Warmup drivers to equilibrium given minimum bonuses """
         print("Warming up the drivers")
         for _ in tqdm( range( 1, self.args.warmup_steps ) ):
             obs = self.env.reset()
             while True:
-                action = np.zeros(self.num_nodes)
+                action = np.ones(self.num_nodes) * self.args.min_bonus
                 obs_, reward_list, done, info = self.env.step(action)  # Assign false to make drivers update policies. 
                 obs = obs_
                 if done:

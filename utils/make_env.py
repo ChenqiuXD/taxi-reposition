@@ -23,6 +23,7 @@ def make_env(args):
     normalize = lambda arr: arr/np.sum(arr)
     node_initial_cars = normalize( np.random.uniform(0.2, 1, num_nodes) ) * 1000
     node_demand = np.vstack( [ normalize(np.random.uniform(0.2, 1, num_nodes))*1000 for _ in range(episode_length) ] )
+    # TODO: not sure whether the demands distibution is correct here. Now it is [num_node*episode_len, num_node], maybe should be [episode_len, num_node, num_node]
     node_distribute = get_demands_distribution(node_demand, adj_mat)
     edge_traffic = np.floor(np.random.uniform(1000, 10000, (episode_length, num_nodes, num_nodes)) * adj_mat_without_diagnal).astype(int)  # Edge traffic
     # upcoming_cars = np.floor(np.random.uniform(-1, 1, [episode_length, num_nodes]) * 100).astype(int)   # Upcoming cars approximately 50

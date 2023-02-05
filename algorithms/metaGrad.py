@@ -45,6 +45,16 @@ class metaAgent(BaseAgent):
         self.critic_target = Critic(self.dim_states, dim_policies).to(self.device)
         self.critic_target.load_state_dict(self.critic.state_dict())
         self.critic_optim = Adam(self.critic.parameters(), lr=10*self.lr)
+
+        #Create replay buffer
+        self.buffer_size = args.buffer_size
+        self.batch_size = args.batch_size
+        self.buffer_ptr = 0
+        self.buffer = np.zeros([self.buffer_size, 2*self.dim_states+self.dim_actions+2])  # each transition is [s,a,r,s',d] where d represents don
+        self.buffer_agents_policies = np.zeros([self.buffer_size, dim_policies])    # Record history agents' actions. [buffer_size, dim_agents_policies]
+        self.curr_agents_policies = np.zeros([self.episode_length, dim_policies])   # Record current iteration agents' policies. [episode_length, dim_agents_policies]
+        self.buffer_time_steps = np.zeros([self.buffer_size])
+        self.buffer_high = 0    # Used to mark the appended buffer (avoid training with un-appended sample indexes)
         
         # Hyper-parameters
         self.tau = args.tau
@@ -67,16 +77,6 @@ class metaAgent(BaseAgent):
         self.nabla_y_F = np.concatenate([np.eye(self.num_nodes)[self.neighbour_list[i]].T 
                                         for i in range(self.num_nodes)], axis=1)
 
-        #Create replay buffer
-        # TODO: maybe I can change the buffer to a RingBuffer, so that the record would be easer. 
-        self.buffer_size = args.buffer_size
-        self.batch_size = args.batch_size
-        self.buffer_ptr = 0
-        self.buffer = np.zeros([self.buffer_size, 2*self.dim_states+self.dim_actions+2])  # each transition is [s,a,r,s',d] where d represents don
-        self.buffer_agents_policies = np.zeros([self.episode_length, dim_policies])
-        self.buffer_time_steps = np.zeros([self.buffer_size])
-        self.buffer_high = 0    # Used to mark the appended buffer (avoid training with un-appended sample indexes)
-
     def choose_action(self, s, is_random=False):
         if is_random:
             actions = np.random.uniform(self.min_bonus, self.max_bonus, self.dim_actions)
@@ -96,8 +96,9 @@ class metaAgent(BaseAgent):
         # Buffer_high would not exceeds so that sample_index in sample_data() would reamin in self.buffer
 
         # Record agents distribution policies
-        self.buffer_agents_policies[s['time_step']] = np.concatenate( [ arr[self.neighbour_list[idx]] / np.sum(arr)
-                                                                        for idx, arr in enumerate(info[0]) ] )
+        agent_policies = np.concatenate( [ arr[self.neighbour_list[idx]] / np.sum(arr) for idx, arr in enumerate(info[0]) ] )
+        self.buffer_agents_policies[self.buffer_ptr] = agent_policies   # Record history agents' actions. [buffer_size, dim_agents_policies]
+        self.curr_agents_policies[s['time_step']] = agent_policies  # Record current agents' policies. [episode_length, dim_agents_policies]
         self.buffer_time_steps[self.buffer_ptr] = s['time_step']
         self.buffer_ptr += 1
 
@@ -114,14 +115,14 @@ class metaAgent(BaseAgent):
             batch_done_np = 1 - batch_memory[:, -1]
             batch_done = torch.FloatTensor(batch_done_np).to(self.device).view([-1,1])
 
-            batch_agents_policies = self.buffer_agents_policies[self.buffer_time_steps[sample_index].astype(int)]
+            batch_agents_policies = self.buffer_agents_policies[sample_index]
             batch_idle_drivers = batch_memory[:, :self.num_nodes]
             batch_demands = batch_memory[:, self.num_nodes: self.num_nodes * 2]
         else:   # Continue append transition, stop learn()
             print("Transition number is lesser than batch_size, continue training. ")
             return
 
-        next_actions = np.array([ self.buffer_agents_policies[\
+        next_actions = np.array([ self.curr_agents_policies[\
                                     self.buffer_time_steps[int( (i_sample+1)*batch_done_np[idx] )].astype(int) ]
                                  for idx, i_sample in enumerate(sample_index) ])
         target_Q = self.critic_target( batch_next_state, torch.FloatTensor(next_actions).to(self.device) )
@@ -169,13 +170,16 @@ class metaAgent(BaseAgent):
                 grad += actor_grads.T @ torch.FloatTensor(nabla_y_x).to(self.device) @ batch_actions_mu.grad / self.batch_size
             else:
                 grad = actor_grads.T @ torch.FloatTensor(nabla_y_x).to(self.device) @ batch_actions_mu.grad / self.batch_size
+
+        # Reshape grads to assign the gradient to 
         shapes = [x.shape for x in self.actor.state_dict().values()]
         shapes_prod = [torch.tensor(s).numpy().prod() for s in shapes]
         grad_split = grad.split(shapes_prod)
-        gradient_calc = {}
+        # gradient_calc = {}
         cnt = 0
-        for n, p in self.actor.named_parameters():
-            gradient_calc[n] = grad_split[cnt]
+        for n, p in self.actor.named_parameters():  # Assign gradient to actor network. 
+            # gradient_calc[n] = grad_split[cnt]
+            p.grad = grad_split[cnt].view(p.grad.shape)
             cnt += 1
 
         self.actor_optim.step()
@@ -241,9 +245,6 @@ class metaAgent(BaseAgent):
         self.actor_target.eval()
         self.critic.eval()
         self.critic_target.eval()
-
-    def reset(self):
-        self.random_process.reset_states()
 
     def load_model(self, output):
         if output is None: return

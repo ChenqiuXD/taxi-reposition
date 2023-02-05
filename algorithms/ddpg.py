@@ -11,6 +11,7 @@ from torch.optim import Adam
 from algorithms.base_agent import BaseAgent
 
 criterion = nn.MSELoss()
+NORMAALIZATION_FACTOR = 100.0
 
 class DDPG(BaseAgent):
     def __init__(self, args, env_config):
@@ -126,7 +127,7 @@ class DDPG(BaseAgent):
 
     def s2obs(self, s):
         """ This function converts state(dict) to observation(ndarray) """
-        return np.concatenate([s['idle_drivers']/100.0, s['demands']/100.0])
+        return np.concatenate([s['idle_drivers']/NORMAALIZATION_FACTOR, s['demands']/NORMAALIZATION_FACTOR])
 
     def prep_train(self):
         self.actor.train()

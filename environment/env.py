@@ -80,19 +80,19 @@ class Env:
 
         # Update agents policy
         time_mat = self.get_time_mat(self.cur_state["len_mat"], self.cur_state["edge_traffic"], self.adj_mat)
-        if self.is_two_loop:   # With one loop, 
-            nodes_actions = self.games[time_step].choose_actions()  # In choose actions, the stochastic is increased by settings actions /3 
-            payoff = self.games[time_step].observe_payoff(bonuses, time_mat, nodes_actions)
-            self.games[time_step].update_policy(payoff)
-        else:
+        if self.is_two_loop:
             for t in range(50): # TODO: 2 timescale, the inner loop require the agents reach the nash equilibrium. 
                 nodes_actions = self.games[time_step].choose_actions()  # In choose actions, the stochastic is increased by settings actions /3 
                 payoff = self.games[time_step].observe_payoff(bonuses, time_mat, nodes_actions)
                 self.games[time_step].update_policy(payoff)
+        else:
+            nodes_actions = self.games[time_step].choose_actions()  # In choose actions, the stochastic is increased by settings actions /3 
+            payoff = self.games[time_step].observe_payoff(bonuses, time_mat, nodes_actions)
+            self.games[time_step].update_policy(payoff)
 
         # NOTE that agents choose actions twice, so that the bonuses would immediately impact on the agents' policies. 
         # Choose actions according to the newly updated agents policies. 
-        nodes_actions = self.games[time_step].choose_actions()  # In choose actions, the stochastic is increased by settings actions /3 
+        nodes_actions = self.games[time_step].choose_actions()  # In choose_actions, the stochasticity can be changed. 
 
         # Prepare information of next state
         if self.cur_state["time_step"]+1 >= self.episode_length:
@@ -103,7 +103,7 @@ class Env:
             done = False
 
         # Calculate reward for drivers agents: returns a list [idle_cost, travelling_time_cost, bonuses_cost]
-        reward = self.reward_func(time_mat, bonuses, nodes_actions) # actions are the bonuses, nodes_actions are the distribution of idle drivers
+        reward = self.reward_func(time_mat, bonuses, nodes_actions)
         # print("Cost is: ", cost)
 
         last_state_demand = self.env_config["node_demand"][time_step-1]
