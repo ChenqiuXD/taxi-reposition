@@ -2,7 +2,7 @@
 This is a repository used in the project "Incentive Design for driver-reposition problem using graph-based reinforcement learning". We explain the usage of each directory in the following diagram
 * `environment`: The reinforcement learning environment which simulate the adpatation behavior of drivers. 
 * `algorithms`: The algorithms used to design the incentive. Currently available: null, meta
-* `output`: Visualization of the simulation result. Note that the file  would appear after running algorithms.   
+* `output`: Visualization of the simulation result. Note that the file would appear after running algorithms.   
 * ~~`tryout_single` is a simpler environment, which only examine one re-position, rather than focus on multi-step re-position problem as reinforcement learning.~~(deleted, please refer to the `direct` method)  
 
 ## Installation

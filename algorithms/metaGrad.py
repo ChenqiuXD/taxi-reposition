@@ -40,6 +40,8 @@ class metaAgent(BaseAgent):
         self.actor_target.load_state_dict(self.actor.state_dict())
         self.actor_optim = Adam(self.actor.parameters(), lr=self.lr)
 
+        self.policy_table = np.zeros([self.episode_length, self.dim_action])
+
         self.critic = Critic(self.dim_states, dim_policies).to(self.device)
         self.critic_target = Critic(self.dim_states, dim_policies).to(self.device)
         self.critic_target.load_state_dict(self.critic.state_dict())
@@ -89,10 +91,12 @@ class metaAgent(BaseAgent):
         if is_random:
             actions = np.random.uniform(self.min_bonus, self.max_bonus, self.dim_actions)
         else:
-            state = torch.FloatTensor(self.s2obs(s)).to(self.device)
-            actions = self.actor(state).cpu().detach().numpy()
-            actions = ( actions + np.random.normal(0, self.epsilon, self.dim_actions) ).clip(self.min_bonus, self.max_bonus)
-            self.epsilon = np.maximum(self.epsilon-self.depsilon, self.epsilon_min) 
+            # state = torch.FloatTensor(self.s2obs(s)).to(self.device)
+            # actions = self.actor(state).cpu().detach().numpy()
+            # actions = ( actions + np.random.normal(0, self.epsilon, self.dim_actions) ).clip(self.min_bonus, self.max_bonus)
+            # self.epsilon = np.maximum(self.epsilon-self.depsilon, self.epsilon_min) 
+            time_step = s["time_step"]
+            actions = self.policy_table[time_step]
         
         return actions
 
@@ -154,13 +158,13 @@ class metaAgent(BaseAgent):
         # Update actor network
         for idx, state in enumerate(batch_state):
             # Try for separate update, first calculate \nabla_\theta \mu(s)
-            actor_criterion = self.actor(state)
-            grads = []
-            for k in range(self.num_nodes): # backward() could only be performed on scalar, thus we use output of each node to calculate backward()
-                self.actor_optim.zero_grad()
-                actor_criterion[k].backward(retain_graph=True)
-                grads.append(torch.cat([ p.grad.flatten().clone().detach() for p in self.actor.parameters() ], dim=0))
-            actor_grads = torch.vstack(grads)
+            # actor_criterion = self.actor(state)
+            # grads = []
+            # for k in range(self.num_nodes): # backward() could only be performed on scalar, thus we use output of each node to calculate backward()
+            #     self.actor_optim.zero_grad()
+            #     actor_criterion[k].backward(retain_graph=True)
+            #     grads.append(torch.cat([ p.grad.flatten().clone().detach() for p in self.actor.parameters() ], dim=0))
+            # actor_grads = torch.vstack(grads)
 
             # Calculate the sensitivity matrix
             agents_policy = batch_agents_policies[idx]
@@ -170,33 +174,41 @@ class metaAgent(BaseAgent):
 
             # then calculate the \nabla_a Q(s,a)
             # TODO: test whether zero_grad is necessary
-            # self.actor_optim.zero_grad()
-            # self.critic_optim.zero_grad()
+            self.critic_optim.zero_grad()
             batch_actions_mu = torch.FloatTensor(agents_policy).to(self.device).requires_grad_(True)
             batch_actions_mu.retain_grad()
-            critic_criteriion = - self.critic(state, batch_actions_mu)
+            critic_criteriion = self.critic(state, batch_actions_mu)
             critic_criteriion.backward()
 
             # Calculate the comprehensive gradient
             if 'grad' in locals().keys():
-                grad += actor_grads.T @ torch.FloatTensor(nabla_y_x).to(self.device) @ batch_actions_mu.grad / self.batch_size
+                # grad += actor_grads.T @ torch.FloatTensor(nabla_y_x).to(self.device) @ batch_actions_mu.grad
+                grad += (nabla_y_x) @ batch_actions_mu.grad.cpu().detach().numpy()
             else:
-                grad = actor_grads.T @ torch.FloatTensor(nabla_y_x).to(self.device) @ batch_actions_mu.grad / self.batch_size
+                # grad = actor_grads.T @ torch.FloatTensor(nabla_y_x).to(self.device) @ batch_actions_mu.grad
+                grad = nabla_y_x @ batch_actions_mu.grad.cpu().detach().numpy()
+        grad = grad / self.batch_size * self.lr
 
         # Reshape grads to actor.parameters() shapes
-        shapes = [x.shape for x in self.actor.state_dict().values()]
-        shapes_prod = [torch.tensor(s).numpy().prod() for s in shapes]
-        grad_split = grad.split(shapes_prod)
-        cnt = 0
-        for n, p in self.actor.named_parameters():  # Assign gradient to actor network. 
-            p.grad = grad_split[cnt].view(p.grad.shape)
-            cnt += 1
+        # shapes = [x.shape for x in self.actor.state_dict().values()]
+        # shapes_prod = [torch.tensor(s).numpy().prod() for s in shapes]
+        # grad_split = grad.split(shapes_prod)
+        # cnt = 0
+        # for n, p in self.actor.named_parameters():  # Assign gradient to actor network. 
+        #     p.grad = grad_split[cnt].view(p.grad.shape)
+        #     cnt += 1
         
         # actor update
-        self.actor_optim.step()
+        # self.actor_optim.step()
+        
+        # actor update in policy table form
+        actions = self.policy_table[0] + grad
+        actions = np.maximum( np.minimum(actions, self.max_bonus), self.min_bonus )
+        self.policy_table[0] = actions
 
         # Record actor gradient
-        actor_grad = torch.concat(grad_split)
+        # actor_grad = torch.concat(grad_split)
+        actor_grad = torch.FloatTensor(grad)
         self.writer.add_scalar("actor_grad_max", torch.max(actor_grad).item(), self.train_steps)
         self.train_steps += 1
 

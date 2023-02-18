@@ -50,6 +50,7 @@ class EnvRunner:
             from algorithms.heuristic import HeuristicPolicy as Algo
         elif self.algorithm_name == 'ddpg':
             from algorithms.ddpg import DDPG as Algo
+            # from algorithms.ddpg_calc import DDPG_calc as Algo
         elif self.algorithm_name == 'direct':
             from algorithms.direct import DirectPolicy as Algo
         elif self.algorithm_name == 'metaGrad':
