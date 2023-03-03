@@ -57,6 +57,8 @@ class EnvRunner:
             from algorithms.metaGrad import metaAgent as Algo
         elif self.algorithm_name == 'ddpg_gnn':
             from algorithms.ddpg_gnn.ddpgGNN import ddpg_GNN_Agent as Algo
+        elif self.algorithm_name == 'dqn':
+            from algorithms.dqn import dqnAgent as Algo
         else:
             raise NotImplementedError("The method " + self.algorithm_name + " is not implemented. Please check env_runner.py line 40 to see whether your method is added to the setup_agent function ")
 
