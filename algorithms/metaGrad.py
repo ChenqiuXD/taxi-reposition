@@ -79,7 +79,8 @@ class metaAgent(BaseAgent):
                                         for i in range(self.num_nodes)], axis=1)
                                                 # calculate the S matrix
         n_node = env_config['num_nodes']
-        self.S = []
+        # Calculate  available nodes. self.S (5*5) @ incentive (5*1) equates the incentive provided to a specific node. 
+        self.S = [] # Compute by adjadency matrix
         for i in range(n_node):
             tmp = np.zeros([n_node, n_node])
             for j in range(n_node):
@@ -110,7 +111,8 @@ class metaAgent(BaseAgent):
         # Record agents distribution policies
         agent_actions = np.concatenate( [ arr[self.neighbour_list[idx]] / np.sum(arr)
                                              for idx, arr in enumerate(info[0]) ] ) # [dim_policies], record the drivers' policies by vector
-        self.buffer_agents_actions[self.buffer_ptr] = agent_actions   # Record history agents' actions. [buffer_size, dim_agents_policies]
+        self.buffer_agents_actions[self.buffer_ptr] = agent_actions*5   # Record history agents' actions. [buffer_size, dim_agents_policies]
+        # TODO: multiply by 5 to make the agents' strategies bigger, to be comparable to state when input to critic network.
         self.curr_agents_policies[s['time_step']] = agent_actions  # Record current agents' policies. [episode_length, dim_agents_policies]
         self.buffer_time_steps[self.buffer_ptr] = s['time_step']
         self.buffer_ptr += 1
@@ -138,7 +140,8 @@ class metaAgent(BaseAgent):
         batch_next_actions = np.array([ self.curr_agents_policies[\
                                     self.buffer_time_steps[int( (i_sample+1)*batch_done_np[idx] )].astype(int) ]
                                  for idx, i_sample in enumerate(sample_index) ])
-        target_Q = self.critic_target( batch_next_state, torch.FloatTensor(batch_next_actions).to(self.device) )
+        # target_Q = self.critic_target( batch_next_state, torch.FloatTensor(batch_next_actions).to(self.device) )
+        target_Q = torch.zeros_like(batch_done) # TO ACCELERATE, since the episode length is one
         target_Q = batch_rewards + (batch_done * self.discount * target_Q).detach()
 
         # Curr q values
@@ -187,7 +190,7 @@ class metaAgent(BaseAgent):
             else:
                 # grad = actor_grads.T @ torch.FloatTensor(nabla_y_x).to(self.device) @ batch_actions_mu.grad
                 grad = nabla_y_x @ batch_actions_mu.grad.cpu().detach().numpy()
-        grad = grad / self.batch_size * self.lr
+        update_term = grad / self.batch_size * self.lr
 
         # Reshape grads to actor.parameters() shapes
         # shapes = [x.shape for x in self.actor.state_dict().values()]
@@ -202,7 +205,8 @@ class metaAgent(BaseAgent):
         # self.actor_optim.step()
         
         # actor update in policy table form
-        actions = self.policy_table[0] + grad
+        # TODO: Only for episode_length = 1, since here we assign policy_table[0]
+        actions = self.policy_table[0] + update_term
         actions = np.maximum( np.minimum(actions, self.max_bonus), self.min_bonus )
         self.policy_table[0] = actions
 

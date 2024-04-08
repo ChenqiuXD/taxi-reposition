@@ -13,32 +13,30 @@ from algorithms.base_agent import BaseAgent
 criterion = nn.MSELoss()
 NORMAALIZATION_FACTOR = 100.0
 
-class dqnAgent(BaseAgent):
+class A2CAgent(BaseAgent):
     def __init__(self, args, env_config):
         super().__init__(args, env_config)
         self.args = args
         if str(args.device) == 'cuda':
             self.use_cuda = True
         if args.seed > 0:
-            self.use_cuda = False
             self.seed(args.seed)
 
         self.device = args.device
         self.dim_states = 2 * env_config["num_nodes"]    # State vector's dimension
         self.dim_actions= env_config["num_nodes"]        # Action vector's dimension
-        self.max_bonus = args.max_bonus
-        self.min_bonus = args.min_bonus
 
-        self.bonus_choice = 4    # Possible selection of actions
-        # self.actions_list = np.linspace(self.min_bonus, self.max_bonus, num=self.bonus_choice)
-        # TODO: Here the self.actions_list is direclty assigned, please change it to adapt with respect to self.bonus_choice
-        self.actions_list = np.array([0,1,2,3])
-        self.num_actions = self.actions_list.shape[0]**self.num_nodes
+        self.action_set = np.array([0,1,2])
+        self.num_actions = np.power(self.action_set.shape[0], self.dim_actions)    # Each node has [0,1,2], self.dim_actions=5 nodes
+        self.actor = Actor(self.dim_states, self.num_actions).to(self.device)
+        self.actor_target = Actor(self.dim_states, self.num_actions).to(self.device)
+        self.actor_target.load_state_dict(self.actor.state_dict())
+        self.actor_optim = Adam(self.actor.parameters(), lr=self.lr)
 
-        self.qnet = net(self.dim_states, self.num_actions).to(self.device)
-        self.qnet_target = net(self.dim_states, self.num_actions).to(self.device)
-        self.qnet_target.load_state_dict(self.qnet.state_dict())
-        self.optim = Adam(self.qnet.parameters(), lr=self.lr)
+        self.critic = Critic(self.dim_states).to(self.device)
+        self.critic_target = Critic(self.dim_states).to(self.device)
+        self.critic_target.load_state_dict(self.critic.state_dict())
+        self.critic_optim = Adam(self.critic.parameters(), lr=10*self.lr)
         
         #Create replay buffer
         self.buffer_size = args.buffer_size
@@ -51,22 +49,14 @@ class dqnAgent(BaseAgent):
         self.tau = args.tau
         self.discount = args.gamma
 
-        # Randomness parameters
-        self.epsilon = args.epsilon
-        # TODO: Currently the self.epsilon would not decrease, please change it to be able to decrease. 
-        self.is_training = True
-
     def choose_action(self, s, is_random=False):
-        if is_random or np.random.uniform() < self.epsilon: # eps usually 0.1
-            # actions = np.random.uniform(self.min_bonus, self.max_bonus, self.dim_actions)
-            actions = np.random.choice(self.actions_list, size=[self.dim_action])
+        if is_random:
+            actions = np.random.choice(a=np.arange(self.num_actions), size=self.dim_actions)
         else:
             state = torch.FloatTensor(self.s2obs(s)).to(self.device)
-            values = self.qnet(state).cpu().detach().numpy()
-            action_list = np.where( values == np.max(values) )[0]
-            action_idx = np.random.choice(action_list)
-            actions = self.convert_actions(action_idx)
-        
+            actions_prob = self.actor(state).cpu().detach().numpy()
+            actions = np.random.choice(a=np.arange(self.num_actions), p=actions_prob, size=1)[0]
+            actions = self.convert_actions(actions)
         return actions
 
     def append_transition(self, s, a, r, d, s_, info):
@@ -92,44 +82,59 @@ class dqnAgent(BaseAgent):
             print("Transition number is lesser than batch_size, continue training. ")
             return
 
-        # Curr q values
-        actions_encoded = torch.LongTensor( [ self.convert_actions(actions) for actions in batch_actions ] ).to(self.device).view([-1,1])
-        curr_Q = self.qnet(batch_state).gather(1, actions_encoded)
-
         # Target q values
-        q_next = self.qnet_target(batch_next_state).detach()
-        q_target = batch_rewards + self.discount * batch_done * q_next.max(1)[0].view(self.batch_size, 1)
+        target_V = self.critic_target( batch_next_state )
+        target_V = batch_rewards + (batch_done * self.discount * target_V).detach()
+
+        # Curr q values
+        curr_V = self.critic(batch_state)
         
         # Update critic
-        loss = F.mse_loss(curr_Q, q_target)
-        self.optim.zero_grad()
-        loss.backward()
-        self.optim.step()
+        td_error = target_V - curr_V
+        critic_loss = td_error.pow(2).mean()
+        self.critic_optim.zero_grad()
+        critic_loss.backward()
+        self.critic_optim.step()
+
+        # Actor loss
+        action_index = torch.LongTensor( self.convert_actions(batch_actions) ).to(self.device).view([-1,1])
+        action_prob = self.actor(batch_state).gather(1, action_index)
+        actor_loss = - (torch.log(action_prob) * td_error.detach()).mean()
+        self.actor_optim.zero_grad()
+        actor_loss.backward()
+        self.actor_optim.step()
 
         # Record the loss trajectory
-        critic_grad = np.concatenate([x.grad.cpu().numpy().reshape([-1]) for x in self.qnet.parameters()])
+        critic_grad = np.concatenate([x.grad.cpu().numpy().reshape([-1]) for x in self.critic.parameters()])
         self.writer.add_scalar("critic_grad_max", np.max(critic_grad), self.train_steps)
-        self.writer.add_scalar("critic_loss", loss.item(), self.train_steps)
+        actor_grad = np.concatenate([x.grad.cpu().numpy().reshape([-1]) for x in self.actor.parameters()])
+        self.writer.add_scalar("actor_grad_max", np.max(actor_grad), self.train_steps)
+        self.writer.add_scalar("critic_loss", critic_loss.item(), self.train_steps)
+        self.writer.add_scalar("actor_loss", actor_loss.item(), self.train_steps)
         self.train_steps += 1
     
         # Soft update the target network
-        for param, target_param in zip(self.qnet.parameters(), self.qnet_target.parameters()):
+        for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
+            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+
+        for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
     def convert_actions(self, num):
-        """ This function converts the  """
+        """ This function converts the actions to action index """
         # TODO: Here the conversion is to [0,1,2,3], please change it to self.actions_list
+        num_bonus = self.action_set.shape[0]
         if type(num) == np.ndarray:   # Convert a list action to a number
-            actions = 0
-            for idx, element in enumerate(num):
-                actions += self.bonus_choice**idx * element
+            actions = np.zeros(num.shape[0])
+            for idx in range(self.dim_action):
+                actions += num_bonus**idx * num[:, idx]
         else:   # Convert number to a list of actions
             tmp = num
             actions = np.zeros(self.num_nodes)
             idx = 0
             while tmp != 0:
-                actions[idx] = tmp%self.bonus_choice
-                tmp = int(tmp/self.bonus_choice)
+                actions[idx] = tmp%num_bonus
+                tmp = int(tmp/num_bonus)
                 idx += 1
         return actions
 
@@ -138,24 +143,36 @@ class dqnAgent(BaseAgent):
         return np.concatenate([s['idle_drivers']/NORMAALIZATION_FACTOR, s['demands']/NORMAALIZATION_FACTOR])
 
     def prep_train(self):
-        self.qnet.train()
-        self.qnet_target.train()
+        self.actor.train()
+        self.actor_target.train()
+        self.critic.train()
+        self.critic_target.train()
 
     def eval(self):
-        self.qnet.eval()
-        self.qnet_target.eval()
+        self.actor.eval()
+        self.actor_target.eval()
+        self.critic.eval()
+        self.critic_target.eval()
 
     def load_model(self, output):
         if output is None: return
 
         self.actor.load_state_dict(
-            torch.load('{}/qnet.pkl'.format(output))
+            torch.load('{}/actor.pkl'.format(output))
+        )
+
+        self.critic.load_state_dict(
+            torch.load('{}/critic.pkl'.format(output))
         )
 
     def save_model(self,output):
         torch.save(
-            self.qnet.state_dict(),
-                os.path.join(output, "qnet.pkl")
+            self.actor.state_dict(),
+                os.path.join(output, "actor.pkl")
+        )
+        torch.save(
+            self.critic.state_dict(),
+                os.path.join(output, "critic.pkl")
         )
 
     def seed(self,s):
@@ -164,13 +181,30 @@ class dqnAgent(BaseAgent):
             torch.cuda.manual_seed(s)
 
 
-class net(nn.Module):
-    def __init__(self, state_dim, num_actions):
-        super(net, self).__init__()
+class Actor(nn.Module):
+    def __init__(self, state_dim, num_action):
+        super(Actor, self).__init__()
 
         self.l1 = nn.Linear(state_dim, 2096)
-        self.l2 = nn.Linear(2096 , 1600)
-        self.l3 = nn.Linear(1600, num_actions)
+        self.l2 = nn.Linear(2096, 1024)
+        self.l3 = nn.Linear(1024, num_action)
+
+    def forward(self, x, softmax_dim=0):
+        x = F.relu(self.l1(x))
+        x = F.relu(self.l2(x))
+        x = self.l3(x)
+        prob = F.softmax(x, dim=softmax_dim)
+        return prob
+
+
+class Critic(nn.Module):
+    def __init__(self, state_dim):
+        """ V-value function """
+        super(Critic, self).__init__()
+
+        self.l1 = nn.Linear(state_dim, 2096)
+        self.l2 = nn.Linear(2096, 1024)
+        self.l3 = nn.Linear(1024, 1)
 
     def forward(self, x):
         x = F.relu(self.l1(x))

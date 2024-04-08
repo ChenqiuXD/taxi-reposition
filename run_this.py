@@ -91,7 +91,7 @@ def main(args):
 
 if __name__ == "__main__":
     # Options: null, heuristic, direct, ddpg, dqn, metaGrad(Proposed, TODO), ddpg_gnn(TODO)
-    algo = 'dqn'
+    algo = 'actor-critic'
 
     # Recommended parameters:
     # episode_length: 1 / 6 / 12;          lr_drivers: 5e-3;           warmup_steps: 3000;             num_env_steps: 10000-20000 (depends on episode_length)
@@ -100,10 +100,10 @@ if __name__ == "__main__":
     input_args = ['--algorithm_name', algo, '--seed', '35', '--mode', 'train',   
                 #   '--is_two_loop',  
                 #   '--decay_drivers_lr', 
-                  '--episode_length', '3', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-1',   
+                  '--episode_length', '1', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-1',   
                   '--lr', '1e-4', '--tau', '5e-3', '--buffer_size', '128', '--batch_size', '16',   
-                  '--warmup_steps', '3000', '--num_env_steps', '8000',  
-                  '--min_epsilon', '0', '--max_epsilon', '0.2', '--decre_epsilon_episodes', '4000']
+                  '--warmup_steps', '3000', '--num_env_steps', '50000',  
+                  '--min_epsilon', '0', '--max_epsilon', '0.1', '--decre_epsilon_episodes', '4000']
                   # "is_two_loop" with this tag, the environment would run in two loops, outer loop would wait until inner loop reach equilibrium. 
 
     # Check if there are input from system, then run the command.
