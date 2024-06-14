@@ -31,24 +31,24 @@ def make_env(args):
     upcoming_cars = np.zeros([episode_length, num_nodes])
 
     env_config = {
-        "num_nodes": 5,
+        "num_nodes": num_nodes,
         "edge_index": edge_index, 
         "dim_node_obs": 3,  # [idle drivers, upcoming cars, demands]
         "dim_edge_obs": 2,  # [traffic flow density, length]
-        "episode_length": episode_length,   
+        "episode_length": episode_length,
 
         "initial_drivers": node_initial_cars,   # Initial idle drivers  [n_node * 1]
-        "node_demand": node_demand,             # Demands for each nodes, [EPISODE_LEN * n_node]
+        "node_demand": node_demand,             # Demands for each nodes, [episode_length * n_node]
         "upcoming_cars": upcoming_cars,         # Initial upcoming cars [n_node * 1]
         "demand_distribution": node_distribute,     # Probability of demands distribute drivers to other nodes
-        "edge_traffic": edge_traffic,           # Traffic at each edges, [EPISODE_LEN * n_node * n_node]
-        "len_vec": len_vec,
+        "edge_traffic": edge_traffic,           # Traffic at each edges, [episode_length * n_node * n_node]
+        "len_vec": len_vec,     # Length of each edges, [n_edge_index * 1]
     }
 
     return Env(env_config=env_config, args=args)
 
 def get_demands_distribution(node_demand, adj_mat):
-    """This function distribute the demands of each nodes
+    """This function distribute the demands of each nodes to neighbouring nodes.
     @params: 
         node_demand: (ndarray, [episode_length, n_node]) demands at each node at each iteration
         adj_mat: (ndarray, [n_node, n_node]) adjcency matrix with self-loop

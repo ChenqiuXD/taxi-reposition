@@ -7,6 +7,7 @@ import os
 class Recorder:
     """ Record necessary information. """
     def __init__(self, all_args) -> None:
+        """ Initialize the recorder with the arguments."""
         self.output_path = all_args.output_path
         self.mode = all_args.mode
 
@@ -22,7 +23,7 @@ class Recorder:
         self.init_setting = setting
 
     def record(self, reward_list, action_list, nodes_actions, idle_drivers):
-        """ This function records the information during one episode """
+        """ Records the information of the current episode into the array."""
         # Initialize the traj variable (require dimension of reward_list and action_list)
         reward_types = reward_list[0].shape[0]
         num_nodes = action_list[0].shape[0]
@@ -42,6 +43,7 @@ class Recorder:
             raise RuntimeError("The recorder's cnt exceeds num_env_steps")
 
     def store_data(self):
+        """ Store the data into a pickle file."""
         data = {
             "init_setting": self.init_setting, 
             "reward_traj": self.reward_traj, 

@@ -80,19 +80,17 @@ class Env:
 
         # Update agents policy
         time_mat = self.get_time_mat(self.cur_state["len_mat"], self.cur_state["edge_traffic"], self.adj_mat)
-        if self.is_two_loop:
-            for t in range(50): # TODO: 2 timescale, the inner loop require the agents reach the nash equilibrium. 
-                nodes_actions = self.games[time_step].choose_actions()  # In choose actions, the stochastic is increased by settings actions /3 
-                payoff = self.games[time_step].observe_payoff(bonuses, time_mat, nodes_actions)
-                self.games[time_step].update_policy(payoff)
+        if self.is_two_loop:    # double loop, the inner loop computes the nash equilibrium. 
+            for t in range(50):
+                nodes_actions = self.games[time_step].choose_actions()
+                self.games[time_step].update_policy(bonuses, time_mat, nodes_actions)
         else:
-            nodes_actions = self.games[time_step].choose_actions()  # In choose actions, the stochastic is increased by settings actions /3 
-            payoff = self.games[time_step].observe_payoff(bonuses, time_mat, nodes_actions)
-            self.games[time_step].update_policy(payoff)
+            nodes_actions = self.games[time_step].choose_actions()
+            self.games[time_step].update_policy(bonuses, time_mat, nodes_actions)
 
         # NOTE that agents choose actions twice, so that the bonuses would immediately impact on the agents' policies. 
         # Choose actions according to the newly updated agents policies. 
-        nodes_actions = self.games[time_step].choose_actions()  # In choose_actions, the stochasticity can be changed. 
+        nodes_actions = self.games[time_step].choose_actions()
 
         # Prepare information of next state
         if self.cur_state["time_step"]+1 >= self.episode_length:
@@ -144,7 +142,7 @@ class Env:
                     nodes_actions: ([num_nodes, num_nodes], ndarray) the drivers' re-position matrix
         OUTPUT:     reward: (scalar) the comprehensive reward
          """
-        norm_factor = {"idle_cost": 1, "travelling_cost": 0, "bonus_cost": 0}
+        norm_factor = {"idle_cost": 1, "travelling_cost": 0.05, "bonus_cost": 0.1}
 
         # Calculate idle/demand cost using mse loss
         # node_cars = np.sum(nodes_actions, axis=0) + self.cur_state["upcoming_cars"]   # Tempoorarily eliminate the impact of upcoming cars. 
@@ -152,29 +150,26 @@ class Env:
         nodes_distribution = node_cars / np.sum(node_cars)
         demands_distribution = self.cur_state["demands"] / np.sum(self.cur_state["demands"])
         
-        # Idle_cost
+        # Idle_cost: should be small
         idle_cost = np.sqrt(np.sum((nodes_distribution-demands_distribution)**2))   # MSE loss between drivers distribution and demands distribution
         # idle_cost = - np.sum( nodes_distribution * np.log(nodes_distribution/demands_distribution) ) # KL divergence between two distribution. 
         idle_cost *= norm_factor['idle_cost']
 
-        # Calculate the travelling time
+        # Calculate the travelling time cost
         travelling_nodes = nodes_actions*(time_mat!=0)  # Eliminate the drivers who stay at current nodes. 
         max_time = np.sum( np.sum(travelling_nodes, axis=1)*np.max(time_mat, axis=1) )
         min_time = 0    # All staying at current node, travelling time would be zero
         avg_travelling_cost = (np.sum(nodes_actions*time_mat)-min_time) / (max_time-min_time)
         avg_travelling_cost *= norm_factor['travelling_cost']
 
-        # Calculate bonuses
+        # Calculate bonuses cost
         max_bonus = np.sum(nodes_actions)*self.max_bonus    # Assign max_bonus to each node
         min_bonus = np.sum(nodes_actions)*self.min_bonus   # Do not assign any bonuses
         bonuses_cost = (np.sum(nodes_actions*bonuses)-min_bonus)/(max_bonus-min_bonus)
         bonuses_cost *= norm_factor['bonus_cost']
 
         # Calculate comprehensive cost
-        overall_cost = (norm_factor['idle_cost']*idle_cost +
-                        norm_factor['travelling_cost']*avg_travelling_cost + 
-                        norm_factor['bonus_cost'] *bonuses_cost) # Bonuses_cost would not be included temporarily. 
-        # print("costs are: {}".format([idle_cost, avg_travelling_cost, bonuses_cost]))
+        overall_cost = (idle_cost + avg_travelling_cost) # Bonuses costs are not included temporarily
 
         return np.array([-idle_cost, -avg_travelling_cost, -bonuses_cost, -overall_cost])*100
 

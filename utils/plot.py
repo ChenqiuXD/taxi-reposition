@@ -34,7 +34,6 @@ def plot_result(all_args, result):
 
     # Get some arg parameters
     episode_length = result["init_setting"]["upcoming_cars"].shape[0]
-    # Obtain current episode numbers 
     reward_traj = result['reward_traj']
     if reward_traj[-1,-1,-1] == 0:
         result_length = np.where( reward_traj[:,:,-1]==reward_traj[-1,:,-1] )[0][0]
@@ -53,23 +52,18 @@ def plot_result(all_args, result):
     # -------------------------------------------------------------------------------------------------------
     # 1 - idle_drivers compared to demands
     # -------------------------------------------------------------------------------------------------------
-    num_avg = 2
+    num_avg = 2 # average over num_avg episodes
     fig = plt.figure(figsize=[35,10])
     for num_step in range(episode_length):
         if plot_type["idle_drivers"]:
             # calculate the ratio between idle drivers and demands
-            # data_demands = [[ result[episode_idx][num_step]["obs"]["demands"][i] for i in range(num_nodes) ] for episode_idx in range(result_length)]
-            # data_idle_drivers = [[ (np.sum(result[episode_idx][num_step]["nodes actions"], axis=0)+
-            #                     result[episode_idx][num_step]["obs"]["upcoming_cars"])[i]  for i in range(num_nodes) ] for episode_idx in range(result_length) ]
-            # ratio = (data_demands+data_idle_drivers) / data_demands
             data_demands = np.array( [result['init_setting']['demands'][num_step]]*result_length )
             data_idle_drivers = np.array([ result["idle_drivers_traj"][episode_idx][num_step] for episode_idx in range(result_length) ])
             ratio = data_idle_drivers / data_demands
 
             # Plot result for each node
             for idx in range(num_nodes):
-                num_subplot = 250+idx+1   # 231, 232 ... 235 for each subplot
-                plt.subplot(num_subplot)
+                plt.subplot(2, 5, idx+1)
                 plt.plot(np.arange(result_length-num_avg), [np.mean(ratio[i:i+num_avg,idx]) for i in range(result_length-num_avg)],
                         label="at node %d"%idx, color=colors[idx])
                 
@@ -79,7 +73,7 @@ def plot_result(all_args, result):
 
             # Plot bonuses trajectory
             for idx in range(num_nodes):
-                plt.subplot(2,5,6+idx)
+                plt.subplot(2,5,idx+6)
                 plt.plot(np.arange(result_length), 
                         np.array([ result['bonus_traj'][k][num_step][idx] for k in range(result_length) ]), 
                         label="node %d"%idx, color=colors[idx])
@@ -94,7 +88,6 @@ def plot_result(all_args, result):
             else:
                 plt.savefig(os.path.join(output_path, name_suffix))
         plt.clf()
-        # plt.close("all")
 
 
     # -------------------------------------------------------------------------------------------------------
@@ -112,10 +105,7 @@ def plot_result(all_args, result):
             reward_sequence = [ np.mean(result['reward_traj'][j][:,i]) for j in range(result_length) ]
             plt.plot(np.arange(result_length-num_avg), np.array([np.mean(reward_sequence[j:j+num_avg]) for j in range(len(reward_sequence)-num_avg)]))
         # plt.show()
-        if platform.system()[0] == 'L':
-            plt.savefig(os.path.join(output_path, 'cost_traj.png'))
-        else:
-            plt.savefig(os.path.join(output_path, "cost_traj.png"))
+        plt.savefig(os.path.join(output_path, "cost_traj.png"))
     plt.cla()
     plt.close("all")
 

@@ -8,18 +8,13 @@ class HeuristicPolicy(BaseAgent):
         self.env_config = env_config
         self.episode_length = args.episode_length
 
-        self.n_interval = 10
+        self.interval = args.lr
         self.min_bonus = args.min_bonus
         self.max_bonus = args.max_bonus
-        self.bonus_degree = np.linspace(self.max_bonus, self.min_bonus, self.n_interval)
-        self.min_ratio = 0.9
-        self.max_ratio = 1.1
-        self.ratio_degree = np.linspace(self.min_ratio, self.max_ratio, self.n_interval)
 
         self.num_nodes = env_config["num_nodes"]
         self.ratio_list = np.ones([self.episode_length, self.num_nodes])*1.01   # Multiply by 1.01, then bonuses would be initially zeros when applying the self.learn() function 
-        self.action = np.zeros([self.episode_length, self.num_nodes])
-        self.cur_time = 0
+        self.action = np.ones([self.episode_length, self.num_nodes]) * self.min_bonus
 
     def append_transition(self, obs, action, reward, done, obs_, info):
         demands = obs["demands"]
@@ -35,13 +30,10 @@ class HeuristicPolicy(BaseAgent):
             for i in range(self.num_nodes):
                 ratio = self.ratio_list[time_step][i]
 
-                if ratio > self.max_ratio:
-                    self.action[time_step][i] = self.min_bonus
-                elif ratio < self.min_ratio:
-                    self.action[time_step][i] = self.max_bonus
-                else:
-                    loc = np.where(ratio<self.ratio_degree)[0][0] # Find which interval that current ratio locates
-                    self.action[time_step][i] = self.bonus_degree[loc]
+                if ratio > 1.0:
+                    self.action[time_step][i] = np.maximum(self.min_bonus, self.action[time_step][i]-self.interval)
+                elif ratio < 1.0:
+                    self.action[time_step][i] = np.minimum(self.max_bonus, self.action[time_step][i]+self.interval)
 
     def choose_action(self, obs, is_random=False):
         """ directly return [0]*num_nodes """

@@ -41,8 +41,7 @@ class EnvRunner:
         self.agent = self.setup_agent()
 
     def setup_agent(self):
-        """Setup agent algorithm
-        P.S. setup this function so that in final experiment, new algorithms could be added"""
+        """Setup agent algorithm"""
         # initialize the policies and organize the agents
         if self.algorithm_name == "null":
             from algorithms.null import NullPolicy as Algo
@@ -88,7 +87,6 @@ class EnvRunner:
 
     def run(self):
         """Collect a training episode transitions and perform training, saving, logging, and evaluation steps"""
-        # Collect data
         self.agent.prep_train()     # call all network.train()
 
         # initial observation
@@ -115,10 +113,6 @@ class EnvRunner:
                 self.total_train_steps += 1
                 self.last_train_T = self.total_env_steps
 
-            # if (self.total_env_steps - self.last_hard_update_T) / self.hard_update_interval >= 1:
-            #     self.last_hard_update_T = self.total_env_steps
-            #     self.agent.hard_target_update()
-
             # Append to record list 
             reward_traj.append(reward_list)
             action_traj[step] = action
@@ -136,7 +130,7 @@ class EnvRunner:
         return reward_traj
 
     def store_data(self):
-        """This function store necessary data"""
+        """Store necessary data"""
         os.makedirs(self.args.output_path, exist_ok=True)
         self.agent.save_model(self.args.output_path)
 

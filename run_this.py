@@ -45,8 +45,8 @@ def main(args):
     print("Render is ", all_args.render)
 
     # set seeds
-    # torch.manual_seed(all_args.seed)
-    # torch.cuda.manual_seed_all(all_args.seed)
+    torch.manual_seed(all_args.seed)
+    torch.cuda.manual_seed_all(all_args.seed)
     np.random.seed(all_args.seed)
 
     # Get save path
@@ -71,6 +71,7 @@ def main(args):
         total_num_steps = 0
         
         runner.warmup() # Warmup drivers with all minimum bonuses. 
+        save_times = 3
         while total_num_steps < all_args.num_env_steps:
             reward_list = runner.run()  # Run an episode 
             total_num_steps += 1
@@ -79,19 +80,19 @@ def main(args):
             print("---------------------------------------------------------------------------------------------------\n\n\n")
 
             # Save data amid process
-            save_times = 3
             if (total_num_steps+1) % int(all_args.num_env_steps / save_times)==0 and np.abs( total_num_steps-all_args.num_env_steps )>save_times:    # Prevent save twice in last few episodes. 
                 runner.store_data()
         runner.store_data()
     elif all_args.mode=="test":
-        pass
+        print("Testing the agent, not yet completed")
+        # TODO: how to test our algorithm?
     else:
         raise RuntimeError("Unexpected mode name '{}'. Allowed mode names are: 'train', 'test'. ".format(all_args.mode))
 
 
 if __name__ == "__main__":
     # Options: null, heuristic, direct, ddpg, dqn, metaGrad(Proposed, TODO), ddpg_gnn(TODO)
-    algo = 'actor-critic'
+    algo = 'ddpg'
 
     # Recommended parameters:
     # episode_length: 1 / 6 / 12;          lr_drivers: 5e-3;           warmup_steps: 3000;             num_env_steps: 10000-20000 (depends on episode_length)
@@ -100,9 +101,9 @@ if __name__ == "__main__":
     input_args = ['--algorithm_name', algo, '--seed', '35', '--mode', 'train',   
                 #   '--is_two_loop',  
                 #   '--decay_drivers_lr', 
-                  '--episode_length', '1', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-1',   
+                  '--episode_length', '6', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-1',   
                   '--lr', '1e-4', '--tau', '5e-3', '--buffer_size', '128', '--batch_size', '16',   
-                  '--warmup_steps', '3000', '--num_env_steps', '50000',  
+                  '--warmup_steps', '3000', '--num_env_steps', '10000',  
                   '--min_epsilon', '0', '--max_epsilon', '0.1', '--decre_epsilon_episodes', '4000']
                   # "is_two_loop" with this tag, the environment would run in two loops, outer loop would wait until inner loop reach equilibrium. 
 

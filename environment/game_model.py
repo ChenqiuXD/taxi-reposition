@@ -107,11 +107,12 @@ class Game:
         for node in self.nodes:
             node.lr = np.maximum( node.lr-self.decrease_lr_drivers, self.min_lr_drivers )
 
-    def update_policy(self, payoff):
+    def update_policy(self, bonuses, time_mat, nodes_actions):
         """Drivers update their policies
         parrams: 
             payoff: [num_nodes, num_nodes] (np.ndarray) simulated payoff matrix with [·]_{ij} represents node i to node j
         """
+        payoff = self.observe_payoff(bonuses, time_mat, nodes_actions)
         for i in range(self.num_nodes):
             self.nodes[i].update_policy(payoff[i][self.neighbour_list[i]])
     
