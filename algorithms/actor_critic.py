@@ -19,6 +19,8 @@ class A2CAgent(BaseAgent):
         self.args = args
         if str(args.device) == 'cuda':
             self.use_cuda = True
+        else:
+            self.use_cuda = False
         if args.seed > 0:
             self.seed(args.seed)
 

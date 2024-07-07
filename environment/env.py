@@ -143,35 +143,35 @@ class Env:
         OUTPUT:     reward: (scalar) the comprehensive reward
          """
         norm_factor = {"idle_cost": 1, "travelling_cost": 0.05, "bonus_cost": 0.1}
+        # norm_factor = {"idle_cost": 1, "travelling_cost": 0., "bonus_cost": 0.}
+        coef = 100  # Rewards are primarily smaller than 1, thus multiply by 100 to make the change more obvious
 
         # Calculate idle/demand cost using mse loss
         # node_cars = np.sum(nodes_actions, axis=0) + self.cur_state["upcoming_cars"]   # Tempoorarily eliminate the impact of upcoming cars. 
         node_cars = np.sum(nodes_actions, axis=0)
         nodes_distribution = node_cars / np.sum(node_cars)
         demands_distribution = self.cur_state["demands"] / np.sum(self.cur_state["demands"])
-        
-        # Idle_cost: should be small
         idle_cost = np.sqrt(np.sum((nodes_distribution-demands_distribution)**2))   # MSE loss between drivers distribution and demands distribution
         # idle_cost = - np.sum( nodes_distribution * np.log(nodes_distribution/demands_distribution) ) # KL divergence between two distribution. 
-        idle_cost *= norm_factor['idle_cost']
+        idle_cost *= norm_factor['idle_cost'] * coef
 
         # Calculate the travelling time cost
         travelling_nodes = nodes_actions*(time_mat!=0)  # Eliminate the drivers who stay at current nodes. 
         max_time = np.sum( np.sum(travelling_nodes, axis=1)*np.max(time_mat, axis=1) )
         min_time = 0    # All staying at current node, travelling time would be zero
         avg_travelling_cost = (np.sum(nodes_actions*time_mat)-min_time) / (max_time-min_time)
-        avg_travelling_cost *= norm_factor['travelling_cost']
+        avg_travelling_cost *= norm_factor['travelling_cost'] * coef
 
         # Calculate bonuses cost
         max_bonus = np.sum(nodes_actions)*self.max_bonus    # Assign max_bonus to each node
         min_bonus = np.sum(nodes_actions)*self.min_bonus   # Do not assign any bonuses
         bonuses_cost = (np.sum(nodes_actions*bonuses)-min_bonus)/(max_bonus-min_bonus)
-        bonuses_cost *= norm_factor['bonus_cost']
+        bonuses_cost *= norm_factor['bonus_cost'] * coef
 
         # Calculate comprehensive cost
-        overall_cost = (idle_cost + avg_travelling_cost) # Bonuses costs are not included temporarily
+        overall_cost = (idle_cost + avg_travelling_cost + bonuses_cost) # Bonuses costs are not included temporarily
 
-        return np.array([-idle_cost, -avg_travelling_cost, -bonuses_cost, -overall_cost])*100
+        return np.array([-idle_cost, -avg_travelling_cost, -bonuses_cost, -overall_cost])
 
     def decrease_lr(self, time_steps):
         """ Lower level agents decrease the learning rate.  """

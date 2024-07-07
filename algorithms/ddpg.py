@@ -1,6 +1,9 @@
 # reference: https://github.com/sweetice/Deep-reinforcement-learning-with-pytorch/blob/master/Char05%20DDPG/DDPG.py 
+# and https://github.com/Jacklinkk/Graph_CAVs
 import os
 import pickle
+import copy
+import collections
 
 import numpy as np
 import torch
@@ -9,6 +12,11 @@ import torch.nn.functional as F
 from torch.optim import Adam
 
 from algorithms.base_agent import BaseAgent
+from torch_geometric.nn import GCNConv
+from torch_geometric.utils import dense_to_sparse
+
+from algorithms.utils.replay_buffer import ReplayBuffer
+from algorithms.utils.prioritized_replay_buffer import PrioritizedReplayBuffer
 
 criterion = nn.MSELoss()
 NORMAALIZATION_FACTOR = 100.0
@@ -19,6 +27,8 @@ class DDPG(BaseAgent):
         self.args = args
         if str(args.device) == 'cuda':
             self.use_cuda = True
+        else:
+            self.use_cuda = False
         if args.seed > 0:
             self.seed(args.seed)
 
@@ -28,95 +38,133 @@ class DDPG(BaseAgent):
         self.max_bonus = args.max_bonus
         self.min_bonus = args.min_bonus
 
-        self.actor = Actor(self.dim_states, self.dim_actions, self.max_bonus, self.min_bonus).to(self.device)
-        self.actor_target = Actor(self.dim_states, self.dim_actions, self.max_bonus, self.min_bonus).to(self.device)
-        self.actor_target.load_state_dict(self.actor.state_dict())
-        self.actor_optim = Adam(self.actor.parameters(), lr=self.lr)
-
-        self.critic = Critic(self.dim_states, self.dim_actions).to(self.device)
-        self.critic_target = Critic(self.dim_states, self.dim_actions).to(self.device)
-        self.critic_target.load_state_dict(self.critic.state_dict())
-        self.critic_optim = Adam(self.critic.parameters(), lr=10*self.lr)
+        if args.use_graph:
+            self.actor = Graph_Actor_Model(env_config["num_nodes"], self.dim_states, self.dim_actions, self.min_bonus, self.max_bonus).to(self.device)
+            self.critic = Graph_Critic_Model(env_config["num_nodes"], self.dim_states, self.dim_actions, self.min_bonus, self.max_bonus).to(self.device)
+        else:
+            self.actor = NonGraph_Actor_Model(env_config["num_nodes"], self.dim_states, self.dim_actions, self.min_bonus, self.max_bonus).to(self.device)
+            self.critic = NonGraph_Critic_Model(env_config["num_nodes"], self.dim_states, self.dim_actions, self.min_bonus, self.max_bonus).to(self.device)
         
-        #Create replay buffer
-        self.buffer_size = args.buffer_size
-        self.batch_size = args.batch_size
-        self.buffer_ptr = 0
-        self.buffer = np.zeros([self.buffer_size, 2*self.dim_states+self.dim_actions+2])  # each transition is [s,a,r,s',d] where d represents done
-        self.buffer_high = 0    # Used to mark the appended buffer (avoid training with un-appended sample indexes)
+        # Target networks
+        self.actor_target = copy.deepcopy(self.actor).to(self.device)
+        self.critic_target = copy.deepcopy(self.critic).to(self.device)
+
+        self.actor_optimizer = Adam(self.actor.parameters(), lr=self.lr)
+        self.critic_optimizer = Adam(self.critic.parameters(), lr=self.lr)
+
+        # Noisy exploration
+        self.explore_noise = OUActionNoise(mu=np.zeros([self.dim_action]))
 
         # Hyper-parameters
+        self.buffer = ReplayBuffer(size=args.buffer_size)
+        self.batch_size = args.batch_size
+        self.gamma = args.gamma
         self.tau = args.tau
         self.discount = args.gamma
 
-        # Randomness parameters
-        self.epsilon_max = args.max_epsilon
-        self.epsilon_min = args.min_epsilon
-        self.depsilon = (self.epsilon_max - self.epsilon_min) / args.decre_epsilon_episodes
-        self.epsilon = self.epsilon_max
+        # Utils
+        self.time_counter = 0
+        self.loss_record = collections.deque(maxlen=100)
         self.is_training = True
 
     def choose_action(self, s, is_random=False):
         if is_random:
-            actions = np.random.uniform(self.min_bonus, self.max_bonus, self.dim_actions)
+            action = np.random.uniform(self.min_bonus, self.max_bonus, self.dim_actions)
         else:
             state = torch.FloatTensor(self.s2obs(s)).to(self.device)
-            actions = self.actor(state).cpu().detach().numpy()
-            actions = ( actions + np.random.normal(0, self.epsilon, self.dim_actions) ).clip(self.min_bonus, self.max_bonus)
-            self.epsilon = np.maximum(self.epsilon-self.depsilon, self.epsilon_min) 
-        
-        return actions
+
+            # Generate action
+            action = self.actor(state)
+            noise = torch.as_tensor(self.explore_noise(), dtype=torch.float32).to(self.device)
+            action = action + noise
+            action = torch.clamp(action, self.min_bonus, self.max_bonus)
+
+        return action.detach().numpy()
 
     def append_transition(self, s, a, r, d, s_, info):
-        if self.buffer_ptr >= self.buffer_size:
-            self.buffer_ptr = 0
-        self.buffer[self.buffer_ptr] = np.concatenate([self.s2obs(s), a, [r], self.s2obs(s_), [d]])
-        self.buffer_ptr += 1
-        self.buffer_high = np.minimum( self.buffer_high+1, self.buffer_size )
-        # Buffer_high would not exceeds so that sample_index in sample_data() would reamin in self.buffer
+        # Append transition
+        self.buffer.add(s, a, r, s_, d)
+    
+    def sample_memory(self):
+        # Call the sampling function in replay_buffer
+        data_sample = self.buffer.sample(self.batch_size)
+        return data_sample
+
+    def loss_process(self, loss, weight):
+        # Calculation of loss based on weight
+        weight = torch.as_tensor(weight, dtype=torch.float32).to(self.device)
+        loss = torch.mean(loss * weight.detach())
+
+        return loss
 
     def learn(self):
-        self.prep_train()
-        # Sample batch
-        if self.buffer_high >= self.batch_size:
-            sample_index = np.random.choice( self.buffer_high, self.batch_size, replace=False ) # Cannot sample replicate samples. 
-            batch_memory = self.buffer[sample_index, :]
-            batch_state = torch.FloatTensor(batch_memory[:, :self.dim_states]).to(self.device)
-            batch_actions = torch.FloatTensor(batch_memory[:, self.dim_states:self.dim_states+self.dim_actions]).to(self.device)
-            batch_rewards = torch.FloatTensor(batch_memory[:, self.dim_states+self.dim_actions:self.dim_states+self.dim_actions+1]).to(self.device)
-            batch_next_state = torch.FloatTensor(batch_memory[:, -self.dim_states-1:-1]).to(self.device)
-            batch_done = torch.FloatTensor(1 - batch_memory[:, -1]).to(self.device).view([-1,1])
-        else:   # Continue append transition, stop learn()
-            print("Transition number is lesser than batch_size, continue training. ")
+        # ------whether to return------ #
+        self.time_counter += 1
+        if (self.time_counter <= 2 * self.batch_size):
             return
 
-        # Target q values
-        target_Q = self.critic_target( batch_next_state, self.actor_target(batch_next_state) )
-        target_Q = batch_rewards + (batch_done * self.discount * target_Q).detach()
+        self.prep_train()
 
-        # Curr q values
-        curr_Q = self.critic(batch_state, batch_actions)
+        # ------ calculates the loss ------ #
+        # Experience pool sampling, samples include weights and indexes,
+        # data_sample is the specific sampled data
+        info_batch, data_batch = self.sample_memory()
         
-        # Update critic
-        critic_loss = F.mse_loss(curr_Q, target_Q)
-        self.critic_optim.zero_grad()
-        critic_loss.backward()
-        self.critic_optim.step()
+        # Initialize the loss matrix
+        actor_loss = []
+        critic_loss = []
 
-        # Actor loss
-        actor_loss = -self.critic( batch_state, self.actor(batch_state) ).mean()
-        self.actor_optim.zero_grad()
-        actor_loss.backward()
-        self.actor_optim.step()
+        # Extract data from each sample in the order in which it is stored
+        # ------loss of critic network------ #
+        for elem in data_batch:
+            state, action, reward, next_state, done = elem
+            state = self.s2obs(state)
+            next_state = self.s2obs(next_state)
+            action = torch.as_tensor(action, dtype=torch.float32).to(self.device)
 
-        # Record the loss trajectory
-        critic_grad = np.concatenate([x.grad.cpu().numpy().reshape([-1]) for x in self.critic.parameters()])
-        self.writer.add_scalar("critic_grad_max", np.max(critic_grad), self.train_steps)
-        actor_grad = np.concatenate([x.grad.cpu().numpy().reshape([-1]) for x in self.actor.parameters()])
-        self.writer.add_scalar("actor_grad_max", np.max(actor_grad), self.train_steps)
-        self.writer.add_scalar("critic_loss", critic_loss.item(), self.train_steps)
-        self.writer.add_scalar("actor_loss", actor_loss.item(), self.train_steps)
-        self.train_steps += 1
+            # target value
+            action_target = self.actor_target(next_state)
+            critic_value_next = self.critic_target(next_state, action_target).detach()
+            critic_value = self.critic(state, action)
+            # critic_value = critic_value.detach()
+            critic_target = reward + self.gamma * critic_value_next * (1 - done)
+
+            critic_loss_sample = F.smooth_l1_loss(critic_value, critic_target)
+            critic_loss.append(critic_loss_sample)
+
+        # critic network update
+        critic_loss_e = torch.stack(critic_loss)
+        critic_loss_total = self.loss_process(critic_loss_e, info_batch['weights'])
+        self.critic_optimizer.zero_grad()
+        # critic_loss_total.backward(retain_graph=True)
+        critic_loss_total.backward()
+        self.critic_optimizer.step()
+
+        # ------loss of actor network------ #
+        for elem in data_batch:
+            state, action, reward, next_state, done = elem
+            state = self.s2obs(state)
+            next_state = self.s2obs(next_state)
+
+            mu = self.actor(state)
+            actor_loss_sample = -1 * self.critic(state, mu)
+            actor_loss_s = actor_loss_sample.mean()
+            actor_loss.append(actor_loss_s)
+
+        # actor network update
+        actor_loss_e = torch.stack(actor_loss)
+        actor_loss_total = self.loss_process(actor_loss_e, info_batch['weights'])
+        self.actor_optimizer.zero_grad()
+        # actor_loss_total.backward(retain_graph=True)
+        actor_loss_total.backward()
+        self.actor_optimizer.step()
+
+        # ------Updating PRE weights------ #
+        if isinstance(self.buffer, PrioritizedReplayBuffer):
+            self.buffer.update_priority(info_batch['indexes'], (critic_loss_e + actor_loss_e))
+
+        # ------Record loss------ #
+        self.loss_record.append(float((critic_loss_total + actor_loss_total).detach().cpu().numpy()))
     
         # Soft update the target network
         for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
@@ -125,9 +173,13 @@ class DDPG(BaseAgent):
         for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
+        self.writer.add_scalar("critic_loss", critic_loss_total.item(), self.time_counter)
+        self.writer.add_scalar("actor_loss", actor_loss_total.item(), self.time_counter)
+
     def s2obs(self, s):
         """ This function converts state(dict) to observation(ndarray) """
-        return np.concatenate([s['idle_drivers']/NORMAALIZATION_FACTOR, s['demands']/NORMAALIZATION_FACTOR])
+        obs = np.concatenate([s['idle_drivers']/NORMAALIZATION_FACTOR, s['demands']/NORMAALIZATION_FACTOR])
+        return torch.FloatTensor(obs).to(self.device)
 
     def prep_train(self):
         self.actor.train()
@@ -155,7 +207,7 @@ class DDPG(BaseAgent):
             torch.load('{}/critic.pkl'.format(output))
         )
 
-    def save_model(self,output):
+    def save_model(self, output):
         torch.save(
             self.actor.state_dict(),
                 os.path.join(output, "actor.pkl")
@@ -168,42 +220,317 @@ class DDPG(BaseAgent):
     def seed(self,s):
         torch.manual_seed(s)
         if self.use_cuda:
-            torch.cuda.manual_seed(s)
+            torch.cuda.manual_seed(s)    
 
 
-class Actor(nn.Module):
-    def __init__(self, state_dim, action_dim, max_action, min_action):
-        super(Actor, self).__init__()
+def datatype_transmission(states, device):
+    """
+        1.This function is used to convert observations in the environment to the
+        float32 Tensor data type that pytorch can accept.
+        2.Pay attention: Depending on the characteristics of the data structure of
+        the observation, the function needs to be changed accordingly.
+    """
+    features = torch.as_tensor(states[0], dtype=torch.float32, device=device)
+    adjacency = torch.as_tensor(states[1], dtype=torch.float32, device=device)
+    mask = torch.as_tensor(states[2], dtype=torch.float32, device=device)
 
-        self.l1 = nn.Linear(state_dim, 400)
-        self.l2 = nn.Linear(400, 300)
-        self.l3 = nn.Linear(300, action_dim)
+    return features, adjacency, mask
 
-        self.max_action = max_action
-        self.min_action = min_action
 
-    def forward(self, x):
-        x = F.relu(self.l1(x))
-        x = F.relu(self.l2(x))
-        x = torch.tanh(self.l3(x)) 
-        x = (x+1) * (self.max_action-self.min_action) / 2 + self.min_action # Normalize actions
+# Defining Ornstein-Uhlenbeck noise for stochastic exploration processes
+class OUActionNoise(object):
+    def __init__(self, mu, sigma=0.15, theta=.2, dt=1e-2, x0=None):
+        self.theta = theta
+        self.mu = mu
+        self.sigma = sigma
+        self.dt = dt
+        self.x0 = x0
+        self.reset()
+
+    def __call__(self):
+        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + \
+            self.sigma * np.sqrt(self.dt) * np.random.normal(size=self.mu.shape)
+        self.x_prev = x
         return x
 
+    def reset(self):
+        self.x_prev = self.x0 if self.x0 is not None else np.zeros_like(self.mu)
 
-class Critic(nn.Module):
-    def __init__(self, state_dim, action_dim):
-        super(Critic, self).__init__()
+    def __repr__(self):
+        return 'OUActionNoise(mu={}, sigma={})'.format(self.mu, self.sigma)
 
-        self.l1 = nn.Linear(state_dim + action_dim, 400)
-        self.l2 = nn.Linear(400 , 300)
-        self.l3 = nn.Linear(300, 1)
 
-    def forward(self, x, u):
-        try:
-            x = F.relu(self.l1(torch.cat([x,u], 1)))
-        except:
-            x = F.relu(self.l1(torch.cat([x,u], 0)))
-        # x = F.relu(self.l1(torch.cat([x, u], 1)))
-        x = F.relu(self.l2(x))
-        x = self.l3(x)
-        return x
+# ------Graph Actor Model------ #
+class Graph_Actor_Model(nn.Module):
+    """
+        1.N is the number of vehicles
+        2.F is the feature length of each vehicle
+        3.A is the number of selectable actions
+    """
+    def __init__(self, N, F, A, action_min, action_max):
+        super(Graph_Actor_Model, self).__init__()
+        self.num_agents = N
+        self.num_outputs = A
+        self.action_min = action_min
+        self.action_max = action_max
+
+        # Encoder
+        self.encoder_1 = nn.Linear(F, 32)
+        self.encoder_2 = nn.Linear(32, 32)
+
+        # GNN
+        self.GraphConv = GCNConv(32, 32)
+        self.GraphConv_Dense = nn.Linear(32, 32)
+
+        # Policy network
+        self.policy_1 = nn.Linear(64, 32)
+        self.policy_2 = nn.Linear(32, 32)
+
+        # Actor network
+        self.pi = nn.Linear(32, A)
+
+        # GPU configuration
+        if torch.cuda.is_available():
+            GPU_num = torch.cuda.current_device()
+            self.device = torch.device("cuda:{}".format(GPU_num))
+        else:
+            self.device = "cpu"
+
+        self.to(self.device)
+
+    def forward(self, observation):
+        """
+            1.The data type here is numpy.ndarray, which needs to be converted to a
+            Tensor data type.
+            2.Observation is the state observation matrix, including X_in, A_in_Dense
+            and RL_indice.
+            3.X_in is the node feature matrix, A_in_Dense is the dense adjacency matrix
+            (NxN) (original input)
+            4.A_in_Sparse is the sparse adjacency matrix COO (2xnum), RL_indice is the
+            reinforcement learning index of controlled vehicles.
+        """
+
+        X_in, A_in_Dense, RL_indice = datatype_transmission(observation, self.device)
+
+        # Encoder
+        X = self.encoder_1(X_in)
+        X = F.relu(X)
+        X = self.encoder_2(X)
+        X = F.relu(X)
+
+        # GCN
+        A_in_Sparse, _ = dense_to_sparse(A_in_Dense)
+        X_graph = self.GraphConv(X, A_in_Sparse)
+        X_graph = F.relu(X_graph)
+        X_graph = self.GraphConv_Dense(X_graph)
+        X_graph = F.relu(X_graph)
+
+        # Features concatenation
+        F_concat = torch.cat((X_graph, X), 1)
+
+        # Policy
+        X_policy = self.policy_1(F_concat)
+        X_policy = F.relu(X_policy)
+        X_policy = self.policy_2(X_policy)
+        X_policy = F.relu(X_policy)
+
+        # Pi
+        pi = self.pi(X_policy)
+
+        # Action limitation
+        amplitude = 0.5 * (self.action_max - self.action_min)
+        mean = 0.5 * (self.action_max + self.action_min)
+        action = amplitude * torch.tanh(pi) + mean
+
+        return action
+
+
+# ------Graph Critic Model------ #
+class Graph_Critic_Model(nn.Module):
+    """
+        1.N is the number of vehicles
+        2.F is the feature length of each vehicle
+        3.A is the number of selectable actions
+    """
+    def __init__(self, N, F, A, action_min, action_max):
+        super(Graph_Critic_Model, self).__init__()
+        self.num_agents = N
+        self.num_outputs = A
+        self.action_min = action_min
+        self.action_max = action_max
+
+        # Encoder
+        self.encoder_1 = nn.Linear(F + A, 32)  # Considering action space
+        self.encoder_2 = nn.Linear(32, 32)
+
+        # GNN
+        self.GraphConv = GCNConv(32, 32)
+        self.GraphConv_Dense = nn.Linear(32, 32)
+
+        # Policy network
+        self.policy_1 = nn.Linear(64, 32)
+        self.policy_2 = nn.Linear(32, 32)
+
+        # Critic network
+        self.value = nn.Linear(32, 1)
+
+        # GPU configuration
+        if torch.cuda.is_available():
+            GPU_num = torch.cuda.current_device()
+            self.device = torch.device("cuda:{}".format(GPU_num))
+        else:
+            self.device = "cpu"
+
+        self.to(self.device)
+
+    def forward(self, observation, action):
+        """
+            1.The data type here is numpy.ndarray, which needs to be converted to a
+            Tensor data type.
+            2.Observation is the state observation matrix, including X_in, A_in_Dense
+            and RL_indice.
+            3.X_in is the node feature matrix, A_in_Dense is the dense adjacency matrix
+            (NxN) (original input)
+            4.A_in_Sparse is the sparse adjacency matrix COO (2xnum), RL_indice is the
+            reinforcement learning index of controlled vehicles.
+        """
+
+        X_in, A_in_Dense, RL_indice = datatype_transmission(observation, self.device)
+
+        # Encoder
+        X_in = torch.cat((X_in, action), 1)
+        X = self.encoder_1(X_in)
+        X = F.relu(X)
+        X = self.encoder_2(X)
+        X = F.relu(X)
+
+        # GCN
+        A_in_Sparse, _ = dense_to_sparse(A_in_Dense)
+        X_graph = self.GraphConv(X, A_in_Sparse)
+        X_graph = F.relu(X_graph)
+        X_graph = self.GraphConv_Dense(X_graph)
+        X_graph = F.relu(X_graph)
+
+        # Feature concatenation
+        F_concat = torch.cat((X_graph, X), 1)
+
+        # Policy network
+        X_policy = self.policy_1(F_concat)
+        X_policy = F.relu(X_policy)
+        X_policy = self.policy_2(X_policy)
+        X_policy = F.relu(X_policy)
+
+        # Value calculation
+        V = self.value(X_policy)
+
+        return V
+
+
+# ------NonGraph Actor Model------ #
+class NonGraph_Actor_Model(nn.Module):
+    """
+       1.N is the number of nodes
+       2.F is the feature length of each nodes
+       3.A is the dimension of action
+   """
+    def __init__(self, N, F, A, action_min, action_max):
+        super(NonGraph_Actor_Model, self).__init__()
+        self.num_agents = N
+        self.num_outputs = A
+        self.action_min = action_min
+        self.action_max = action_max
+
+        # Encoder
+        self.policy_1 = nn.Linear(F, 32)
+        self.policy_2 = nn.Linear(32, 32)
+
+        # Actor network
+        self.pi = nn.Linear(32, A)
+
+        # GPU configuration
+        if torch.cuda.is_available():
+            GPU_num = torch.cuda.current_device()
+            self.device = torch.device("cuda:{}".format(GPU_num))
+        else:
+            self.device = "cpu"
+
+        self.to(self.device)
+
+    def forward(self, observation):
+        """
+            1.Observation is the state observation matrix.
+        """
+
+        # X_in, _, RL_indice = datatype_transmission(observation, self.device)
+        X_in = observation
+
+        # Policy
+        X_policy = self.policy_1(X_in)
+        X_policy = F.relu(X_policy)
+        X_policy = self.policy_2(X_policy)
+        X_policy = F.relu(X_policy)
+
+        # Pi
+        pi = self.pi(X_policy)
+
+        # Action limitation
+        amplitude = 0.5 * (self.action_max - self.action_min)
+        mean = 0.5 * (self.action_max + self.action_min)
+        action = amplitude * torch.tanh(pi) + mean
+
+        return action
+
+
+# ------NonGraph Critic Model------ #
+class NonGraph_Critic_Model(nn.Module):
+    """
+        1.N is the number of vehicles
+        2.F is the feature length of each vehicle
+        3.A is the number of selectable actions
+    """
+    def __init__(self, N, F, A, action_min, action_max):
+        super(NonGraph_Critic_Model, self).__init__()
+        self.num_agents = N
+        self.num_outputs = A
+        self.action_min = action_min
+        self.action_max = action_max
+
+        # Policy network
+        self.policy_1 = nn.Linear(F + A, 32)
+        self.policy_2 = nn.Linear(32, 32)
+
+        # Critic network
+        self.value = nn.Linear(32, 1)
+
+        # GPU configuration
+        if torch.cuda.is_available():
+            GPU_num = torch.cuda.current_device()
+            self.device = torch.device("cuda:{}".format(GPU_num))
+        else:
+            self.device = "cpu"
+
+        self.to(self.device)
+
+    def forward(self, observation, action):
+        """
+            1.The data type here is numpy.ndarray, which needs to be converted to a
+            Tensor data type.
+            2.Observation is the state observation matrix, including X_in, and RL_indice.
+            3.X_in is the node feature matrix, RL_indice is the reinforcement learning
+            index of controlled vehicles.
+        """
+
+        # X_in, _, RL_indice = datatype_transmission(observation, self.device)
+        X_in = observation
+
+        # Policy
+        X_in = torch.cat((X_in, action))
+        X_policy = self.policy_1(X_in)
+        X_policy = F.relu(X_policy)
+        X_policy = self.policy_2(X_policy)
+        X_policy = F.relu(X_policy)
+
+        # Value
+        V = self.value(X_policy)
+
+        return V

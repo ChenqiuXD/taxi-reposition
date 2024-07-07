@@ -1,5 +1,4 @@
 import numpy as np
-import math
 from utils.plot import plot_result
 import os
 from tqdm import tqdm
