@@ -79,7 +79,7 @@ class DDPG_graph(BaseAgent):
             action = action + noise
             action = torch.clamp(action, self.min_bonus, self.max_bonus)
 
-        return action.detach().numpy()
+        return action.detach().cpu().numpy()
 
     def append_transition(self, s, a, r, d, s_, info):
         # Append transition

@@ -60,7 +60,7 @@ class DDPG():
             action = action + noise
             action = torch.clamp(action, -1, +1)
 
-        return action.detach().numpy()
+        return action.detach().cpu().numpy()
 
     def append_transition(self, s, a, r, d, s_, info=None):
         # Append transition
