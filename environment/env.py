@@ -142,7 +142,7 @@ class Env:
                     nodes_actions: ([num_nodes, num_nodes], ndarray) the drivers' re-position matrix
         OUTPUT:     reward: (scalar) the comprehensive reward
          """
-        norm_factor = {"idle_cost": 1, "travelling_cost": 0.05, "bonus_cost": 0.1}
+        norm_factor = {"idle_cost": 1, "travelling_cost": 0.05, "bonus_cost": 0.005}
         # norm_factor = {"idle_cost": 1, "travelling_cost": 0., "bonus_cost": 0.}
         coef = 100  # Rewards are primarily smaller than 1, thus multiply by 100 to make the change more obvious
 

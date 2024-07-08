@@ -49,6 +49,8 @@ class EnvRunner:
         elif self.algorithm_name == 'ddpg':
             from algorithms.ddpg import DDPG as Algo
             # from algorithms.ddpg_calc import DDPG_calc as Algo
+        elif self.algorithm_name == 'ddpg_graph':
+            from algorithms.ddpg_graph import DDPG_graph as Algo
         elif self.algorithm_name == 'direct':
             from algorithms.direct import DirectPolicy as Algo
         elif self.algorithm_name == 'metaGrad':

@@ -23,7 +23,6 @@ def parse_args(args, parser):
     parser.add_argument('--mode', type=str, default="train", help='train, test')
     parser.add_argument('--is_two_loop', action="store_true", help='whether the environment simulates in two loops or one loops. ')
     parser.add_argument('--decay_drivers_lr', action="store_true", help='whether the environment would decay the learning rate of drivers ')
-    parser.add_argument('--use_graph', action="store_true", help='whether the agent use graph-based neural network.')
 
     parser.add_argument('--lr_drivers', type=float, default=1e-3, help="learning rate for drivers")
     parser.add_argument('--decrease_lr_drivers', type=float, default=1e-6, help="Decrement of learning rate of drivers")
@@ -100,12 +99,10 @@ if __name__ == "__main__":
     # lr: 5e-3(direct), 1e-3(heuristic) 1e-4 (ddpg);            tau: 5e-3;          batch_size: 32
     # buffer_size: 256(should be small, since single loop leads to an non-stationary environment);   
     input_args = ['--algorithm_name', algo, '--seed', '35', '--mode', 'train',   
-                #   '--is_two_loop',  
-                #   '--decay_drivers_lr', 
-                #   '--use_graph',
+                #   '--is_two_loop', 
                   '--episode_length', '6', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-1',   
                   '--lr', '1e-4', '--tau', '5e-3', '--buffer_size', '256', '--batch_size', '32',   
-                  '--warmup_steps', '500', '--num_env_steps', '10000']
+                  '--warmup_steps', '500', '--num_env_steps', '4000']
                   # "is_two_loop" with this tag, the environment would run in two loops, outer loop would wait until inner loop reach equilibrium. 
 
     # Check if there are input from system, then run the command.
