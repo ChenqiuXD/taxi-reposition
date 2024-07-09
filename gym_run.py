@@ -4,7 +4,7 @@ from algorithms.ddpg_gym import DDPG
 import matplotlib.pyplot as plt
 
 # Create the MountainCar environment
-env = gym.make('MountainCarContinuous-v0', render_mode="human")
+env = gym.make('Pendulum-v1', render_mode="rgb_array")
 
 # Create the DDPG agent
 agent = DDPG(env.observation_space.shape[0], env.action_space.shape[0], 1e-3)
@@ -16,7 +16,8 @@ if train:
     rewards = []
 
     # Train the agent
-    for episode in range(2):
+    print("Start training")
+    for episode in range(100):
         cnt = 0
         state, _ = env.reset()
         done = False
@@ -26,7 +27,7 @@ if train:
             cnt += 1
             # env.render()
 
-            if cnt >= 1000:
+            if cnt >= 10000:
                 break
 
             action = agent.choose_action(state)
