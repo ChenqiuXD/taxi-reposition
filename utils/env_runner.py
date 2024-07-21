@@ -46,19 +46,17 @@ class EnvRunner:
             from algorithms.null import NullPolicy as Algo
         elif self.algorithm_name == 'heuristic':
             from algorithms.heuristic import HeuristicPolicy as Algo
+        elif self.algorithm_name == 'direct':
+            from algorithms.direct import DirectPolicy as Algo
         elif self.algorithm_name == 'ddpg':
             from algorithms.ddpg import DDPG as Algo
             # from algorithms.ddpg_calc import DDPG_calc as Algo
+        elif self.algorithm_name == 'ppo':
+            from algorithms.ppo import PPO as Algo
         elif self.algorithm_name == 'ddpg_graph':
             from algorithms.ddpg_graph import DDPG_graph as Algo
-        elif self.algorithm_name == 'direct':
-            from algorithms.direct import DirectPolicy as Algo
         elif self.algorithm_name == 'metaGrad':
             from algorithms.metaGrad import metaAgent as Algo
-        elif self.algorithm_name == 'dqn':
-            from algorithms.dqn import dqnAgent as Algo
-        elif self.algorithm_name == 'actor-critic':
-            from algorithms.actor_critic import A2CAgent as Algo
         else:
             raise NotImplementedError("The method " + self.algorithm_name + " is not implemented. Please check env_runner.py line 40 to see whether your method is added to the setup_agent function ")
 
@@ -79,7 +77,7 @@ class EnvRunner:
         for _ in tqdm( range( 1, self.args.warmup_steps ) ):
             obs = self.env.reset()
             while True:
-                action = np.ones(self.num_nodes) * self.args.min_bonus
+                action = np.ones(self.num_nodes) * (self.args.min_bonus + self.args.max_bonus) / 2
                 obs_, reward_list, done, info = self.env.step(action)  # Assign false to make drivers update policies. 
                 obs = obs_
                 if done:
@@ -103,7 +101,7 @@ class EnvRunner:
 
             action = self.agent.choose_action(obs)                
             obs_, reward_list, done, info = self.env.step(action)  # reward_list : [idle_prob, avg_travelling_cost, bonuses_cost, overall_cost](+,+,+,-) only the last one is minus
-            print("At step", step, " agent choose action ", np.round(action, decimals=3))
+            # print("At step", step, " agent choose action ", np.round(action, decimals=3))
             # self.env.decrease_lr(step)  # Decrease the learning rate of drivers' agents
             # print("At step {}, costs are: idle_prob {}, travelling_cost {}, bonuses_cost {}".format(step, reward_list[0], reward_list[1], reward_list[2]) )
             

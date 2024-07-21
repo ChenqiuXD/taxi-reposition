@@ -12,6 +12,7 @@ from utils.get_output_folder import get_output_folder
 def parse_args(args, parser):
     """ Add arguments to the 'args' variable """
     parser.add_argument('--epsilon', type=float, default=0.1, help="Epsilon greedy")
+    parser.add_argument('--normalization_factor', type=float, default=100., help="normalize the states")
     parser.add_argument('--max_epsilon', type=float, default=0.2, help="max epsilon")
     parser.add_argument('--min_epsilon', type=float, default=0.05, help="min epsilon")
     parser.add_argument('--decre_epsilon_episodes', type=float, default=10000, help="Number of episodes that the epsilon would decrese to minimum")
@@ -75,9 +76,10 @@ def main(args):
         while total_num_steps < all_args.num_env_steps:
             reward_list = runner.run()  # Run an episode 
             total_num_steps += 1
-            print("---------------------------------------------------------------------------------------------------")
-            print("At episode ", total_num_steps, " reward sum is: ", np.sum([reward_list[i][-1] for i in range(len(reward_list))]))
-            print("---------------------------------------------------------------------------------------------------\n\n\n")
+            if total_num_steps % 400 == 0:
+                print("---------------------------------------------------------------------------------------------------")
+                print("At episode ", total_num_steps, " reward sum is: ", np.sum([reward_list[i][-1] for i in range(len(reward_list))]))
+                print("---------------------------------------------------------------------------------------------------\n\n\n")
 
             # Save data amid process
             if (total_num_steps+1) % int(all_args.num_env_steps / save_times)==0 and np.abs( total_num_steps-all_args.num_env_steps )>save_times:    # Prevent save twice in last few episodes. 
@@ -92,17 +94,17 @@ def main(args):
 
 if __name__ == "__main__":
     # Options: null, heuristic, direct, ddpg, dqn, metaGrad(Proposed, TODO), ddpg_gnn(TODO)
-    algo = 'ddpg'
+    algo = 'PPO'
 
     # Recommended parameters:
     # episode_length: 1 / 6 / 12;          lr_drivers: 5e-3;           warmup_steps: 500;             num_env_steps: 10000-20000 (depends on episode_length)
     # lr: 5e-3(direct), 1e-3(heuristic) 1e-4 (ddpg);            tau: 5e-3;          batch_size: 32
     # buffer_size: 256(should be small, since single loop leads to an non-stationary environment);   
-    input_args = ['--algorithm_name', algo, '--seed', '35', '--mode', 'train',   
-                #   '--is_two_loop', 
-                  '--episode_length', '6', '--min_bonus', '0', '--max_bonus', '4', '--lr_drivers', '5e-1',   
-                  '--lr', '1e-4', '--tau', '5e-3', '--buffer_size', '256', '--batch_size', '32',   
-                  '--warmup_steps', '500', '--num_env_steps', '4000']
+    input_args = ['--algorithm_name', algo.lower(), '--seed', '35', '--mode', 'train', '--normalization_factor', '100.0' ,
+                #   '--is_two_loop',
+                  '--episode_length', '6', '--min_bonus', '-4', '--max_bonus', '4', '--lr_drivers', '5e-1',   
+                  '--lr', '1e-4', '--tau', '5e-3', '--buffer_size', '256', '--batch_size', '64', '--epsilon', '0.5', 
+                  '--warmup_steps', '500', '--num_env_steps', '5000']
                   # "is_two_loop" with this tag, the environment would run in two loops, outer loop would wait until inner loop reach equilibrium. 
 
     # Check if there are input from system, then run the command.

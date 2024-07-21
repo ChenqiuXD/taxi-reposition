@@ -51,7 +51,7 @@ class PPOPolicy(nn.Module):
         action = dist.sample()
         log_prob = torch.sum(dist.log_prob(action), dim=1)
 
-        return action[0].detach().numpy(), torch.squeeze(log_prob).detach().numpy(), torch.squeeze(values).detach().numpy()
+        return action[0].detach().cpu().numpy(), torch.squeeze(log_prob).detach().numpy(), torch.squeeze(values).detach().numpy()
 
     def get_values(self, obs):
         """

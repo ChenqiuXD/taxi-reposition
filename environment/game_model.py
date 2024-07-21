@@ -73,7 +73,7 @@ class Game:
                         t_{ij} : travelling time from node i to j. (·/max_time*max_bonus for normalization)
                         r_j : bonuses obtained, range from [0, max_bonus] (no normalization)
         """
-        factor = {"idle": 1, "time": 0.5, "bonuses": 0.25, 'entropy': 0.2}
+        factor = {"idle": 1, "time": 0.5, "bonuses": 0.25, 'entropy': 1.0}
         # Calculate idle drivers
         # node_all_cars = np.sum(actions, axis=0) + self.node_upcoming_car
         node_all_cars = np.sum(actions, axis=0)

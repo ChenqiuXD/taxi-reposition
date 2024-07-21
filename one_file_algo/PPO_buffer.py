@@ -86,6 +86,7 @@ class PPOBuffer:
         self.pointer += 1
 
     def process_trajectory(self, gamma, gae_lam, is_last_terminal, last_v):
+        # TODO: what's usage of this function? 
         path_slice = slice(self.start_index, self.pointer)
         values_t = self.values[path_slice]
 

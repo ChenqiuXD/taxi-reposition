@@ -21,7 +21,7 @@ class DirectPolicy(BaseAgent):
         self.min_bonus = args.min_bonus
         self.max_bonus = args.max_bonus
 
-        self.action = np.ones([self.episode_length, self.num_nodes])*(self.min_bonus)   # start with minimum bonuses
+        self.action = np.ones([self.episode_length, self.num_nodes])*(self.min_bonus + self.max_bonus)/2   # start with minimum bonuses
         self.min_bonus = args.min_bonus
         self.max_bonus = args.max_bonus
 
@@ -90,6 +90,8 @@ class DirectPolicy(BaseAgent):
     
     def get_L(self, policies, idle_drivers, demands):
         """ This function calculate the L matrix """
+        # TODO: if I change the factor["entropy"], will it affect the result of direct method?
+        # Ans: seems no effect. 
         n_node = idle_drivers.shape[0]
         dim_policies = np.sum(self.num_neighbour)
 

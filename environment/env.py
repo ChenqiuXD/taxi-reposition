@@ -135,6 +135,24 @@ class Env:
 
         return next_state, reward, done, [nodes_actions]    # next_state, reward_list [3 types of cost], done, info (information required for some algorithms)
 
+    @ staticmethod
+    def smooth_indicator(x, center=1, alpha=100):
+        """
+        Smooth version of the indicator function \mathbf{1}(x==1).
+        Exponentially decays as x becomes farther away from 1.
+        
+        Parameters:
+        x : float or np.ndarray
+            The input value(s).
+        alpha : float
+            The parameter controlling the degree of smoothness.
+            
+        Returns:
+        float or np.ndarray
+            The smooth indicator value(s).
+        """
+        return np.exp(-alpha*(x-center)**2)
+
     def reward_func(self, time_mat, bonuses, nodes_actions):
         """ The reward function of MDP
         INPUT:      time_mat: ([num_nodes, num_nodes], ndarray) the travelling time between nodes 
@@ -142,8 +160,8 @@ class Env:
                     nodes_actions: ([num_nodes, num_nodes], ndarray) the drivers' re-position matrix
         OUTPUT:     reward: (scalar) the comprehensive reward
          """
-        norm_factor = {"idle_cost": 1, "travelling_cost": 0.05, "bonus_cost": 0.005}
-        # norm_factor = {"idle_cost": 1, "travelling_cost": 0., "bonus_cost": 0.}
+        # norm_factor = {"idle_cost": 1, "travelling_cost": 0.05, "bonus_cost": 0.005}
+        norm_factor = {"idle_cost": 1, "travelling_cost": 0., "bonus_cost": 0.}
         coef = 100  # Rewards are primarily smaller than 1, thus multiply by 100 to make the change more obvious
 
         # Calculate idle/demand cost using mse loss
@@ -151,7 +169,9 @@ class Env:
         node_cars = np.sum(nodes_actions, axis=0)
         nodes_distribution = node_cars / np.sum(node_cars)
         demands_distribution = self.cur_state["demands"] / np.sum(self.cur_state["demands"])
-        idle_cost = np.sqrt(np.sum((nodes_distribution-demands_distribution)**2))   # MSE loss between drivers distribution and demands distribution
+        ratio = nodes_distribution / demands_distribution
+        idle_cost = 1 - np.sum( self.smooth_indicator(ratio, center=1, alpha=100) ) / self.num_nodes
+        # idle_cost = np.sqrt(np.sum((nodes_distribution-demands_distribution)**2))   # MSE loss between drivers distribution and demands distribution
         # idle_cost = - np.sum( nodes_distribution * np.log(nodes_distribution/demands_distribution) ) # KL divergence between two distribution. 
         idle_cost *= norm_factor['idle_cost'] * coef
 
@@ -171,11 +191,7 @@ class Env:
         # Calculate comprehensive cost
         overall_cost = (idle_cost + avg_travelling_cost + bonuses_cost) # Bonuses costs are not included temporarily
 
-        return np.array([-idle_cost, -avg_travelling_cost, -bonuses_cost, -overall_cost])
-
-    def decrease_lr(self, time_steps):
-        """ Lower level agents decrease the learning rate.  """
-        self.games[time_steps].decrease_lr()        
+        return np.array([-idle_cost, -avg_travelling_cost, -bonuses_cost, -overall_cost])       
 
     def get_time_mat(self, len_mat, traffic, adj_mat):
         """ This function simulate the re-position process and return the time matrix 
